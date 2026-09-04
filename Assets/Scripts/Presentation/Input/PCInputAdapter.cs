@@ -80,6 +80,23 @@ namespace KOA.Presentation.Input
             {
                 _currentInput.CastIntent = CastIntent.CastUltimate;
             }
+
+            // ปุ่มตัวเลข 1 - 6 สำหรับ Active Item (Section 5.1 & Section 7.2)
+            for (int i = 0; i < 6; i++)
+            {
+                if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha1 + i))
+                {
+                    ActiveItemSlotToUse = i;
+                    break;
+                }
+            }
+        }
+
+        public int ActiveItemSlotToUse { get; private set; } = -1;
+
+        public void ConsumeActiveItemSlot()
+        {
+            ActiveItemSlotToUse = -1;
         }
 
         public InputFrame GetCurrentInput()

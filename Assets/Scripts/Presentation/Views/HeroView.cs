@@ -28,6 +28,23 @@ namespace KOA.Presentation.Views
         private const float SimulationTickRate = 1.0f / 30.0f; // 30 Ticks/sec ตาม Section 1.1
         private float _vfxTimer = 0f;
 
+        public void BindHero(VorkasHero hero)
+        {
+            if (Hero != null) UnsubscribeHeroEvents();
+
+            Hero = hero;
+            if (Hero != null)
+            {
+                SubscribeHeroEvents();
+                if (healthBar != null)
+                {
+                    healthBar.BindTarget(transform);
+                    healthBar.SetHealth(Hero.CurrentHp, Hero.EffectiveMaxHp);
+                    healthBar.SetMana(Hero.CurrentMana, Hero.EffectiveMaxMana);
+                }
+            }
+        }
+
         private void Awake()
         {
             if (inputAdapter == null)
@@ -35,22 +52,26 @@ namespace KOA.Presentation.Views
                 inputAdapter = GetComponent<PCInputAdapter>();
             }
 
-            // สร้าง Core Logic instance โดยไม่ผูกกับ MonoBehaviour
-            Hero = new VorkasHero(transform.position);
-
-            // Bind UI
-            if (healthBar != null)
+            if (Hero == null)
             {
-                healthBar.BindTarget(transform);
-                healthBar.SetHealth(Hero.CurrentHp, Hero.EffectiveMaxHp);
-                healthBar.SetMana(Hero.CurrentMana, Hero.EffectiveMaxMana);
+                BindHero(new VorkasHero(transform.position));
             }
+        }
 
-            // สมัคร Events จาก Core
+        private void SubscribeHeroEvents()
+        {
             Hero.OnHealthChanged += HandleHealthChanged;
             Hero.OnManaChanged += HandleManaChanged;
             Hero.OnIronCleaveExecuted += HandleIronCleaveExecuted;
             Hero.OnBasicAttackExecuted += HandleBasicAttackExecuted;
+        }
+
+        private void UnsubscribeHeroEvents()
+        {
+            Hero.OnHealthChanged -= HandleHealthChanged;
+            Hero.OnManaChanged -= HandleManaChanged;
+            Hero.OnIronCleaveExecuted -= HandleIronCleaveExecuted;
+            Hero.OnBasicAttackExecuted -= HandleBasicAttackExecuted;
         }
 
         private void OnDestroy()
@@ -120,6 +141,13 @@ namespace KOA.Presentation.Views
 
             // เคลียร์ Intent หลังจากประมวลผลในรอบ Tick
             inputAdapter.ConsumeIntent();
+
+            // 3. ตรวจสอบการกดใช้ Active Item (Hotkeys 1 - 6)
+            if (inputAdapter.ActiveItemSlotToUse >= 0)
+            {
+                Hero.Inventory.TryUseActive(inputAdapter.ActiveItemSlotToUse);
+                inputAdapter.ConsumeActiveItemSlot();
+            }
         }
 
         private void HandleHealthChanged(float current, float max)

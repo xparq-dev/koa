@@ -65,13 +65,16 @@ namespace KOA.Core.Entities
         public Quaternion Rotation { get; set; } = Quaternion.identity;
         public bool IsAlive => CurrentHp > 0f;
 
-        // สถิติสุทธิหลังรวมการเติบโตต่อเลเวล (และไอเทมในอนาคต)
-        public float EffectiveMaxHp => BaseMaxHp + (StatGrowth.HpPerLevel * (CurrentLevel - 1));
-        public float EffectiveMaxMana => BaseMaxMana + (StatGrowth.ManaPerLevel * (CurrentLevel - 1));
-        public float EffectiveArmor => BaseArmor + (StatGrowth.ArmorPerLevel * (CurrentLevel - 1));
-        public float EffectiveMagicResist => BaseMagicResist + (StatGrowth.MrPerLevel * (CurrentLevel - 1));
-        public float EffectiveAttackDamage => BaseAttackDamage + (StatGrowth.AdPerLevel * (CurrentLevel - 1));
-        public float EffectiveMoveSpeed => BaseMoveSpeed;
+        // ระบบช่องเก็บของ 6 ช่อง (Section 5.1)
+        public KOA.Core.Items.Inventory Inventory { get; } = new KOA.Core.Items.Inventory();
+
+        // สถิติสุทธิหลังรวมการเติบโตต่อเลเวล และไอเทมในกระเป๋า (Section 2.2 & Section 5.2)
+        public float EffectiveMaxHp => BaseMaxHp + (StatGrowth.HpPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxHp;
+        public float EffectiveMaxMana => BaseMaxMana + (StatGrowth.ManaPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxMana;
+        public float EffectiveArmor => BaseArmor + (StatGrowth.ArmorPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusArmor;
+        public float EffectiveMagicResist => BaseMagicResist + (StatGrowth.MrPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMagicResist;
+        public float EffectiveAttackDamage => BaseAttackDamage + (StatGrowth.AdPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusAttackDamage;
+        public float EffectiveMoveSpeed => BaseMoveSpeed + Inventory.TotalBonusMoveSpeed;
 
         // Events สำหรับ Presentation Layer เพื่ออัปเดต UI/Billboard โดยไม่ผูกติดกัน (Decoupled Core)
         public event Action<float, float> OnHealthChanged;
@@ -97,6 +100,12 @@ namespace KOA.Core.Entities
             CurrentLevel = 1;
             CurrentHp = EffectiveMaxHp;
             CurrentMana = EffectiveMaxMana;
+
+            Inventory.OnStatsRecalculated += () =>
+            {
+                OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
+                OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
+            };
         }
 
         /// <summary>
