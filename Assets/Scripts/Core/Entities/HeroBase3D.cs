@@ -200,6 +200,16 @@ namespace KOA.Core.Entities
         }
 
         /// <summary>
+        /// สั่งเคลื่อนที่ไปยังจุดหมายปลายทาง (Click-to-move Section 7.2)
+        /// </summary>
+        public abstract void SetMoveDestination(Vector3 destination);
+
+        /// <summary>
+        /// สั่งหยุดเดิน
+        /// </summary>
+        public abstract void StopMoving();
+
+        /// <summary>
         /// Tick ฟังก์ชันสำหรับ Simulation Core (รันที่ 30 Ticks/sec ตาม Section 1.1)
         /// </summary>
         public abstract void SimulationTick(float deltaTime);

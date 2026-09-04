@@ -160,6 +160,7 @@ namespace KOA.Presentation.Testing
 
             PCInputAdapter inputAdapter = _playerHeroGo.AddComponent<PCInputAdapter>();
             _playerHeroView = _playerHeroGo.AddComponent<HeroView>();
+            _playerHeroView.BindHero(CurrentPlayerHero);
 
             // อัปเดตกล้องให้จับตามฮีโร่ใหม่
             var cam = UnityEngine.Camera.main?.GetComponent<TopDownCameraController>();

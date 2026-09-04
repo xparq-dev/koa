@@ -22,13 +22,13 @@ namespace KOA.Presentation.Views
         [SerializeField] private LineRenderer ironCleaveLineRenderer;
         [SerializeField] private float vfxDuration = 0.25f;
 
-        public VorkasHero Hero { get; private set; }
+        public HeroBase3D Hero { get; private set; }
 
         private float _simulationAccumulator = 0f;
         private const float SimulationTickRate = 1.0f / 30.0f; // 30 Ticks/sec ตาม Section 1.1
         private float _vfxTimer = 0f;
 
-        public void BindHero(VorkasHero hero)
+        public void BindHero(HeroBase3D hero)
         {
             if (Hero != null) UnsubscribeHeroEvents();
 
@@ -62,16 +62,24 @@ namespace KOA.Presentation.Views
         {
             Hero.OnHealthChanged += HandleHealthChanged;
             Hero.OnManaChanged += HandleManaChanged;
-            Hero.OnIronCleaveExecuted += HandleIronCleaveExecuted;
-            Hero.OnBasicAttackExecuted += HandleBasicAttackExecuted;
+
+            if (Hero is VorkasHero v)
+            {
+                v.OnIronCleaveExecuted += HandleIronCleaveExecuted;
+                v.OnBasicAttackExecuted += HandleBasicAttackExecuted;
+            }
         }
 
         private void UnsubscribeHeroEvents()
         {
             Hero.OnHealthChanged -= HandleHealthChanged;
             Hero.OnManaChanged -= HandleManaChanged;
-            Hero.OnIronCleaveExecuted -= HandleIronCleaveExecuted;
-            Hero.OnBasicAttackExecuted -= HandleBasicAttackExecuted;
+
+            if (Hero is VorkasHero v)
+            {
+                v.OnIronCleaveExecuted -= HandleIronCleaveExecuted;
+                v.OnBasicAttackExecuted -= HandleBasicAttackExecuted;
+            }
         }
 
         private void OnDestroy()
@@ -124,18 +132,37 @@ namespace KOA.Presentation.Views
                 Hero.SetMoveDestination(input.TargetDestination);
             }
 
-            // 2. ตรวจสอบการโจมตีหรือใช้สกิล (Section 6.1)
+            // 2. ตรวจสอบการโจมตีหรือใช้สกิล (Section 6.1 - 6.5)
             switch (input.CastIntent)
             {
                 case CastIntent.CastAttack:
                     if (dummyTarget != null)
                     {
-                        Hero.TryBasicAttack(dummyTarget);
+                        if (Hero is VorkasHero v) v.TryBasicAttack(dummyTarget);
+                        else if (dummyTarget.IsAlive && Vector3.Distance(Hero.Position, dummyTarget.Position) <= Hero.AttackRange)
+                        {
+                            dummyTarget.TakeDamage(Hero.EffectiveAttackDamage, DamageType.Physical);
+                        }
                     }
                     break;
 
                 case CastIntent.CastSkill1:
-                    Hero.TryCastIronCleave(input.AimVector, dummyTarget);
+                    if (Hero is VorkasHero v1) v1.TryCastIronCleave(input.AimVector, dummyTarget);
+                    else if (Hero is ZenthisHero z1) z1.TryCastSacredHourglass(input.AimVector, dummyTarget);
+                    else if (Hero is KorvaxHero k1) k1.TryCastHeavyBolt(input.AimVector, dummyTarget);
+                    else if (Hero is GravitorHero g1) g1.TryCastMagneticPull(input.AimVector, dummyTarget);
+                    break;
+
+                case CastIntent.CastSkill2:
+                    if (Hero is ZenthisHero z2) z2.TryCastAuraOfEternity();
+                    else if (Hero is KorvaxHero k2) k2.TryCastHuntersFocus();
+                    else if (Hero is GravitorHero g2) g2.TryCastRepulsionZone(dummyTarget);
+                    break;
+
+                case CastIntent.CastUltimate:
+                    if (Hero is ZenthisHero z3) z3.TryCastGrandRewind();
+                    else if (Hero is KorvaxHero k3) k3.TryCastBallistaOverdrive(input.AimVector, dummyTarget);
+                    else if (Hero is GravitorHero g3) g3.TryCastGravityCollapse(input.AimVector, dummyTarget);
                     break;
             }
 

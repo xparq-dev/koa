@@ -53,7 +53,7 @@ namespace KOA.Core.Entities
         /// <summary>
         /// สั่งเคลื่อนที่ไปยังจุดหมายปลายทาง (Click-to-move ตาม Section 7.2)
         /// </summary>
-        public void SetMoveDestination(Vector3 destination)
+        public override void SetMoveDestination(Vector3 destination)
         {
             destination.y = Position.y; // ล็อกแกน Y ให้อยู่บนระนาบสนาม
             TargetDestination = destination;
@@ -64,7 +64,7 @@ namespace KOA.Core.Entities
         /// <summary>
         /// สั่งหยุดเดิน
         /// </summary>
-        public void StopMoving()
+        public override void StopMoving()
         {
             IsMoving = false;
             TargetDestination = Position;

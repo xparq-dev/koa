@@ -58,14 +58,14 @@ namespace KOA.Core.Entities
             TargetDestination = spawnPosition;
         }
 
-        public void SetMoveDestination(Vector3 destination)
+        public override void SetMoveDestination(Vector3 destination)
         {
             destination.y = Position.y;
             TargetDestination = destination;
             IsMoving = true;
         }
 
-        public void StopMoving()
+        public override void StopMoving()
         {
             IsMoving = false;
             TargetDestination = Position;
