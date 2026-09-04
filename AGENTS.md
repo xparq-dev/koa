@@ -10,5 +10,5 @@
 - ทุกโค้ดต้องยึดสถาปัตยกรรม Decoupled Core (Section 1 ใน Requirement)
   ห้าม mix Simulation Logic กับ Presentation Layer
 - Engine: Unity 3D URP, ภาษา C#
-- ตอนนี้กำลังอยู่ Phase 1 (Vertical Slice — 1 ฮีโร่ ต่อยหุ่น) ของ Roadmap — เช็คตาราง task ในไฟล์ roadmap ก่อนเริ่มงานทุกครั้ง
+- ตอนนี้กำลังอยู่ Phase 2 (Core Loop สมบูรณ์ — Bot + แผนที่ + เศรษฐกิจ) ของ Roadmap — เช็คตาราง task ในไฟล์ roadmap ก่อนเริ่มงานทุกครั้ง
 - อ้างอิง Section เลขจาก Requirement เสมอเวลาอธิบายงาน (เช่น "ตาม Section 6.1")

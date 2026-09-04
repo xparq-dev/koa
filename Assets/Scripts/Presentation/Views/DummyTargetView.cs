@@ -42,6 +42,7 @@ namespace KOA.Presentation.Views
 
             // สมัคร Events
             Logic.OnHealthChanged += HandleHealthChanged;
+            Logic.OnDamageTaken += HandleDamageTaken;
             Logic.OnDied += HandleDied;
             Logic.OnRespawned += HandleRespawned;
         }
@@ -51,6 +52,7 @@ namespace KOA.Presentation.Views
             if (Logic != null)
             {
                 Logic.OnHealthChanged -= HandleHealthChanged;
+                Logic.OnDamageTaken -= HandleDamageTaken;
                 Logic.OnDied -= HandleDied;
                 Logic.OnRespawned -= HandleRespawned;
             }
@@ -67,6 +69,14 @@ namespace KOA.Presentation.Views
             if (healthBar != null)
             {
                 healthBar.SetHealth(current, max);
+            }
+        }
+
+        private void HandleDamageTaken(float damageAmount, KOA.Data.Enums.DamageType damageType)
+        {
+            if (DamagePopupManager.Instance != null)
+            {
+                DamagePopupManager.Instance.ShowDamage(transform.position, damageAmount, damageType);
             }
         }
 

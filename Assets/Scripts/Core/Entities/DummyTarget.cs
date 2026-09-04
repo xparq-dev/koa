@@ -23,6 +23,7 @@ namespace KOA.Core.Entities
         private const float RespawnDelay = 3.0f;
 
         public event Action<float, float> OnHealthChanged;
+        public event Action<float, DamageType> OnDamageTaken;
         public event Action OnDied;
         public event Action OnRespawned;
 
@@ -53,6 +54,7 @@ namespace KOA.Core.Entities
             }
 
             CurrentHp = Mathf.Max(0f, CurrentHp - netDamage);
+            OnDamageTaken?.Invoke(netDamage, damageType);
             OnHealthChanged?.Invoke(CurrentHp, MaxHp);
 
             if (CurrentHp <= 0f)
