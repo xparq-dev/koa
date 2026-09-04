@@ -29,11 +29,51 @@ namespace KOA.Presentation.Testing
         private HeroView _playerHeroView;
         private MatchHUD _matchHud;
 
-        private void Start()
+        private void Awake()
         {
-            if (autoBuildOnStart)
+            if (autoBuildOnStart && _playerHeroGo == null)
             {
                 BuildFullArena();
+            }
+        }
+
+        private void Start()
+        {
+            if (autoBuildOnStart && _playerHeroGo == null)
+            {
+                BuildFullArena();
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (autoBuildOnStart && _playerHeroGo == null)
+            {
+                BuildFullArena();
+            }
+        }
+
+        [ContextMenu("Build Arena Now")]
+        public void BuildArenaContext()
+        {
+            BuildFullArena();
+        }
+
+        private void OnGUI()
+        {
+            // หากระบบยังไม่ได้ถูกสร้าง (เช่น กรณีเพิ่ม Script ขณะกำลังรัน Play Mode อยู่)
+            if (_playerHeroGo == null)
+            {
+                int btnWidth = 320;
+                int btnHeight = 60;
+                int x = (Screen.width - btnWidth) / 2;
+                int y = (Screen.height - btnHeight) / 2;
+
+                GUI.Box(new Rect(x - 20, y - 40, btnWidth + 40, btnHeight + 70), "KOA Duel Arena Setup");
+                if (GUI.Button(new Rect(x, y, btnWidth, btnHeight), "⚔️ กดปุ่มนี้เพื่อเริ่มสร้างสนาม (Build Arena)"))
+                {
+                    BuildFullArena();
+                }
             }
         }
 
