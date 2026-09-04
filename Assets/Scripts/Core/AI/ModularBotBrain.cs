@@ -20,6 +20,7 @@ namespace KOA.Core.AI
         public DummyTarget TargetDummy { get; set; }
 
         public StateMachine<ModularBotBrain, BotStateKey> FSM { get; private set; }
+        public BotStateKey CurrentState => FSM != null ? FSM.CurrentStateKey : BotStateKey.Idle;
 
         // ความเร็วของศัตรูเพื่อการคำนวณ Prediction (Hard Tier)
         private Vector3 _lastEnemyPos;

@@ -84,6 +84,36 @@ namespace KOA.Core.Entities
         public event Action OnDied;
         public event Action OnRespawned;
 
+        protected void InvokeHealthChanged()
+        {
+            OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
+        }
+
+        protected void InvokeManaChanged()
+        {
+            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
+        }
+
+        public bool TryConsumeMana(float cost)
+        {
+            if (CurrentMana < cost) return false;
+            CurrentMana -= cost;
+            InvokeManaChanged();
+            return true;
+        }
+
+        public void RestoreHealth(float amount)
+        {
+            CurrentHp = Mathf.Min(EffectiveMaxHp, CurrentHp + amount);
+            InvokeHealthChanged();
+        }
+
+        public void SetHealthExplicit(float newHp)
+        {
+            CurrentHp = Mathf.Clamp(newHp, 0f, EffectiveMaxHp);
+            InvokeHealthChanged();
+        }
+
         protected HeroBase3D(string heroId, string displayName, float baseHp, float baseMana, float baseArmor, float baseMr, float baseAd, float baseSpeed, float attackRange, HeroStatGrowth statGrowth)
         {
             HeroId = heroId;

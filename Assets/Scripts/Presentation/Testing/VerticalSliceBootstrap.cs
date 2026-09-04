@@ -1,6 +1,7 @@
 using KOA.Core.AI;
 using KOA.Core.Entities;
 using KOA.Core.Match;
+using KOA.Core.Structures;
 using KOA.Presentation.Camera;
 using KOA.Presentation.Input;
 using KOA.Presentation.UI;

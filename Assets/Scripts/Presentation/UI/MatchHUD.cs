@@ -17,12 +17,11 @@ namespace KOA.Presentation.UI
     /// </summary>
     public class MatchHUD : MonoBehaviour
     {
-        [Header("State References")]
-        public HeroBase3D CurrentPlayerHero;
-        public PlayerWallet PlayerWallet;
-        public MatchSimulation MatchSimulation;
-        public ModularBotBrain BotBrain;
-        public ShopSystem ShopSystem;
+        public HeroBase3D CurrentPlayerHero { get; set; }
+        public PlayerWallet PlayerWallet { get; set; }
+        public MatchSimulation MatchSimulation { get; set; }
+        public ModularBotBrain BotBrain { get; set; }
+        public ShopSystem ShopSystem { get; set; }
 
         public event Action<string> OnHeroSwitched; // heroName
 

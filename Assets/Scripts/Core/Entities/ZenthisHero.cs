@@ -80,11 +80,10 @@ namespace KOA.Core.Entities
         /// </summary>
         public bool TryCastSacredHourglass(Vector3 targetGroundPos, DummyTarget dummyTarget)
         {
-            if (!IsAlive || Skill1CooldownRemaining > 0f || CurrentMana < Skill1ManaCost) return false;
+            if (!IsAlive || Skill1CooldownRemaining > 0f) return false;
+            if (!TryConsumeMana(Skill1ManaCost)) return false;
 
-            CurrentMana -= Skill1ManaCost;
             Skill1CooldownRemaining = Skill1CooldownDuration;
-            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
 
             Vector3 center = targetGroundPos;
             center.y = Position.y;
@@ -109,12 +108,11 @@ namespace KOA.Core.Entities
         /// </summary>
         public bool TryCastAuraOfEternity()
         {
-            if (!IsAlive || Skill2CooldownRemaining > 0f || CurrentMana < Skill2ManaCost) return false;
+            if (!IsAlive || Skill2CooldownRemaining > 0f) return false;
+            if (!TryConsumeMana(Skill2ManaCost)) return false;
 
-            CurrentMana -= Skill2ManaCost;
             Skill2CooldownRemaining = Skill2CooldownDuration;
             Skill2ActiveTimer = Skill2Duration;
-            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
 
             OnAuraOfEternityCast?.Invoke();
             return true;
@@ -126,13 +124,11 @@ namespace KOA.Core.Entities
         /// </summary>
         public bool TryCastGrandRewind()
         {
-            if (!IsAlive || UltimateCooldownRemaining > 0f || CurrentMana < UltimateManaCost) return false;
-
+            if (!IsAlive || UltimateCooldownRemaining > 0f) return false;
             if (_historySnapshots.Count == 0) return false;
+            if (!TryConsumeMana(UltimateManaCost)) return false;
 
-            CurrentMana -= UltimateManaCost;
             UltimateCooldownRemaining = UltimateCooldownDuration;
-            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
 
             var oldest = _historySnapshots.Peek();
             Position = oldest.Pos;
@@ -140,7 +136,7 @@ namespace KOA.Core.Entities
             TargetDestination = Position;
             IsMoving = false;
 
-            OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
+            InvokeHealthChanged();
             OnGrandRewindCast?.Invoke(Position, CurrentHp);
             return true;
         }
@@ -154,7 +150,7 @@ namespace KOA.Core.Entities
             {
                 PassiveCooldownRemaining = PassiveInternalCooldown;
                 CurrentHp = EffectiveMaxHp * 0.20f; // รอดตายฟื้น HP 20%
-                OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
+                InvokeHealthChanged();
                 return;
             }
 

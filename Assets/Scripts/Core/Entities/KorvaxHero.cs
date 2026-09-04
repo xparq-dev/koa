@@ -80,11 +80,10 @@ namespace KOA.Core.Entities
         /// </summary>
         public bool TryCastHeavyBolt(Vector3 aimWorldPos, DummyTarget dummyTarget)
         {
-            if (!IsAlive || Skill1CooldownRemaining > 0f || CurrentMana < Skill1ManaCost) return false;
+            if (!IsAlive || Skill1CooldownRemaining > 0f) return false;
+            if (!TryConsumeMana(Skill1ManaCost)) return false;
 
-            CurrentMana -= Skill1ManaCost;
             Skill1CooldownRemaining = Skill1CooldownDuration;
-            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
 
             Vector3 aimDir = (aimWorldPos - Position);
             aimDir.y = 0;
@@ -115,12 +114,11 @@ namespace KOA.Core.Entities
         /// </summary>
         public bool TryCastHuntersFocus()
         {
-            if (!IsAlive || Skill2CooldownRemaining > 0f || CurrentMana < Skill2ManaCost) return false;
+            if (!IsAlive || Skill2CooldownRemaining > 0f) return false;
+            if (!TryConsumeMana(Skill2ManaCost)) return false;
 
-            CurrentMana -= Skill2ManaCost;
             Skill2CooldownRemaining = Skill2CooldownDuration;
             Skill2ActiveTimer = Skill2Duration;
-            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
 
             OnHuntersFocusActivated?.Invoke();
             return true;
@@ -131,11 +129,10 @@ namespace KOA.Core.Entities
         /// </summary>
         public bool TryCastBallistaOverdrive(Vector3 aimWorldPos, DummyTarget dummyTarget)
         {
-            if (!IsAlive || UltimateCooldownRemaining > 0f || CurrentMana < UltimateManaCost) return false;
+            if (!IsAlive || UltimateCooldownRemaining > 0f) return false;
+            if (!TryConsumeMana(UltimateManaCost)) return false;
 
-            CurrentMana -= UltimateManaCost;
             UltimateCooldownRemaining = UltimateCooldownDuration;
-            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
 
             Vector3 aimDir = (aimWorldPos - Position);
             aimDir.y = 0;

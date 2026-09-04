@@ -105,13 +105,9 @@ namespace KOA.Core.Entities
         public bool TryCastIronCleave(Vector3 aimWorldPos, DummyTarget target)
         {
             if (!IsAlive) return false;
-            if (Skill1CooldownRemaining > 0f) return false;
-            if (CurrentMana < Skill1ManaCost) return false;
-
             // หักมานาและตั้งคูลดาวน์
-            CurrentMana -= Skill1ManaCost;
+            if (!TryConsumeMana(Skill1ManaCost)) return false;
             Skill1CooldownRemaining = Skill1CooldownDuration;
-            OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
             OnSkill1CooldownUpdated?.Invoke(Skill1CooldownRemaining, Skill1CooldownDuration);
 
             // ทิศทาง Aim Vector

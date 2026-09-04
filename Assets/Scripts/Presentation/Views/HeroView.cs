@@ -86,10 +86,7 @@ namespace KOA.Presentation.Views
         {
             if (Hero != null)
             {
-                Hero.OnHealthChanged -= HandleHealthChanged;
-                Hero.OnManaChanged -= HandleManaChanged;
-                Hero.OnIronCleaveExecuted -= HandleIronCleaveExecuted;
-                Hero.OnBasicAttackExecuted -= HandleBasicAttackExecuted;
+                UnsubscribeHeroEvents();
             }
         }
 
