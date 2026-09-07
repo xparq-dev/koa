@@ -140,13 +140,13 @@ namespace KOA.Core.Entities
         }
 
         /// <summary>
-        /// เรียกทุก Tick ขณะอยู่ใน Fountain Zone: ฟื้น HP/Mana 20% MaxHP-MaxMana ต่อวินาที (Section 3.1)
+        /// เรียกทุก Tick ขณะอยู่ใน Fountain Zone: ฟื้น HP/Mana ~11% MaxHP-MaxMana ต่อวินาที (ประมาณ 8-10 วิเต็มหลอด แบบ LoL)
         /// </summary>
         public void FountainZoneTick(float deltaTime)
         {
             if (!IsAlive) return;
-            float hpRegen = EffectiveMaxHp * 0.20f * deltaTime;
-            float manaRegen = EffectiveMaxMana * 0.20f * deltaTime;
+            float hpRegen = EffectiveMaxHp * 0.11f * deltaTime;
+            float manaRegen = EffectiveMaxMana * 0.11f * deltaTime;
             CurrentHp = Mathf.Min(EffectiveMaxHp, CurrentHp + hpRegen);
             CurrentMana = Mathf.Min(EffectiveMaxMana, CurrentMana + manaRegen);
             InvokeHealthChanged();

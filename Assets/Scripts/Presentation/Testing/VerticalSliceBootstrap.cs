@@ -36,11 +36,11 @@ namespace KOA.Presentation.Testing
         private MatchHUD _matchHud;
         private bool _isBuilt = false;
 
-        // Respawn System
+        // Respawn System (Fountain Zone: Section 3.1)
         private float _playerRespawnTimer = -1f;
         private float _botRespawnTimer = -1f;
-        private Vector3 _blueFountain = new Vector3(0, 0, -33f);
-        private Vector3 _redFountain = new Vector3(0, 0, 33f);
+        private Vector3 _blueFountain = new Vector3(0, 0, -60f);
+        private Vector3 _redFountain = new Vector3(0, 0, 60f);
         private GameObject _botGo;
         private GameObject _botGoRef;
 
@@ -189,12 +189,20 @@ namespace KOA.Presentation.Testing
                 lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             }
 
-            // 2. Ground Plane 70x20m (Section 3.1)
+            // 2. Ground Plane 130x26m (Section 3.1)
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "DuelArena_70x20m";
+            ground.name = "DuelArena_130x26m";
             ground.transform.position = Vector3.zero;
-            ground.transform.localScale = new Vector3(2.0f, 1.0f, 7.0f); // 20m x 70m
+            ground.transform.localScale = new Vector3(2.6f, 1.0f, 13.0f); // 26m x 130m
             ground.GetComponent<Renderer>().material.color = new Color(0.20f, 0.23f, 0.22f);
+
+            // 2.1 Fountain Visual Platforms (ลานวงกลมบ่อน้ำฮีลลิ่ง รัศมี 7.5m)
+            CreateFountainVisual(_blueFountain, "BlueFountain_Zone", new Color(0.15f, 0.5f, 0.95f, 0.4f), 7.5f);
+            CreateFountainVisual(_redFountain, "RedFountain_Zone", new Color(0.95f, 0.25f, 0.2f, 0.4f), 7.5f);
+
+            // 2.2 พุ่มไม้ 2 จุดกลางเลน (Section 3.1 Bush Zones)
+            CreateBushVisual(new Vector3(-8f, 0.4f, 0f), new Vector3(3.2f, 0.8f, 9.0f), "Bush_West");
+            CreateBushVisual(new Vector3(8f, 0.4f, 0f), new Vector3(3.2f, 0.8f, 9.0f), "Bush_East");
 
             // 3. DamagePopupManager
             if (FindAnyObjectByType<DamagePopupManager>() == null)
@@ -202,10 +210,8 @@ namespace KOA.Presentation.Testing
                 new GameObject("DamagePopupManager").AddComponent<DamagePopupManager>();
             }
 
-            // 4. Match Simulation (Blue Fountain: Z = -32, Red Fountain: Z = +32)
-            Vector3 blueFountain = new Vector3(0, 0, -32f);
-            Vector3 redFountain = new Vector3(0, 0, 32f);
-            MatchSimulation = new MatchSimulation(blueFountain, redFountain);
+            // 4. Match Simulation (Blue Fountain: Z = -60, Red Fountain: Z = +60)
+            MatchSimulation = new MatchSimulation(_blueFountain, _redFountain);
 
             // Hook Minion wave visuals
             MatchSimulation.BlueSpawner.OnWaveSpawned += HandleWaveVisuals;
@@ -220,12 +226,11 @@ namespace KOA.Presentation.Testing
             SpawnTowerView(MatchSimulation.RedInnerTower, "RedInnerTower", Color.red);
             SpawnTowerView(MatchSimulation.RedNexus, "RedNexus", new Color(0.7f, 0f, 0f));
 
-            // 6. สร้าง Player Hero (เริ่มด้วย Vorkas)
+            // 6. สร้าง Player Hero (เริ่มด้วย Vorkas เกิดที่บ่อ Blue)
             SpawnPlayerHero("Vorkas");
 
-            // 7. สร้าง Bot Hero (Red Team) ควบคุมโดย ModularBotBrain (Section 9)
+            // 7. สร้าง Bot Hero (Red Team เกิดที่บ่อ Red) ควบคุมโดย ModularBotBrain (Section 9)
             SpawnBotHero("Vorkas");
-
 
             // 8. สร้าง MatchHUD
             GameObject hudGo = new GameObject("MatchHUD");
@@ -264,12 +269,19 @@ namespace KOA.Presentation.Testing
 
         private void SpawnMinionView(MinionEntity minion)
         {
-            GameObject minionGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            PrimitiveType pType = minion.Type == MinionType.Cannon ? PrimitiveType.Cylinder : PrimitiveType.Cube;
+            GameObject minionGo = GameObject.CreatePrimitive(pType);
             minionGo.name = $"{minion.MinionId}_{minion.Type}";
-            minionGo.transform.position = minion.Position;
-            minionGo.transform.localScale = minion.Type == MinionType.Melee 
-                ? new Vector3(0.8f, 0.8f, 0.8f) 
-                : new Vector3(0.6f, 0.6f, 0.6f);
+            minionGo.transform.position = minion.Position + Vector3.up * 0.4f;
+
+            Vector3 scale = minion.Type switch
+            {
+                MinionType.Super => new Vector3(1.5f, 1.5f, 1.5f),
+                MinionType.Cannon => new Vector3(1.1f, 0.9f, 1.1f),
+                MinionType.Melee => new Vector3(0.85f, 0.85f, 0.85f),
+                _ => new Vector3(0.65f, 0.65f, 0.65f) // Ranged
+            };
+            minionGo.transform.localScale = scale;
 
             Color barColor = minion.TeamId == 0 ? Color.cyan : Color.red;
             var hb = CreateHealthBar(minionGo.transform, $"{minion.MinionId}_HealthBar", barColor);
@@ -291,7 +303,7 @@ namespace KOA.Presentation.Testing
 
             _playerHeroGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             _playerHeroGo.name = $"Hero_{heroName}";
-            _playerHeroGo.transform.position = new Vector3(0, 1.0f, -4.0f);
+            _playerHeroGo.transform.position = _blueFountain + new Vector3(0, 1.0f, 0);
 
             Color heroColor = heroName switch
             {
@@ -365,7 +377,7 @@ namespace KOA.Presentation.Testing
 
             _botGoRef = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             _botGoRef.name = $"Bot_{heroName}";
-            _botGoRef.transform.position = new Vector3(0, 1.0f, 8.0f);
+            _botGoRef.transform.position = _redFountain + new Vector3(0, 1.0f, 0);
 
             Color botColor = heroName switch
             {
@@ -491,6 +503,30 @@ namespace KOA.Presentation.Testing
             wsHealthBar.SetupScaleBar(fillQuad.transform);
 
             return wsHealthBar;
+        }
+
+        private void CreateFountainVisual(Vector3 center, string name, Color color, float radius)
+        {
+            GameObject pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pad.name = name;
+            pad.transform.position = new Vector3(center.x, 0.02f, center.z);
+            pad.transform.localScale = new Vector3(radius * 2f, 0.03f, radius * 2f);
+            Destroy(pad.GetComponent<Collider>());
+            var mat = new Material(Shader.Find("Sprites/Default"));
+            mat.color = color;
+            pad.GetComponent<Renderer>().material = mat;
+        }
+
+        private void CreateBushVisual(Vector3 center, Vector3 size, string name)
+        {
+            GameObject bush = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bush.name = name;
+            bush.transform.position = center;
+            bush.transform.localScale = size;
+            Destroy(bush.GetComponent<Collider>());
+            var mat = new Material(Shader.Find("Sprites/Default"));
+            mat.color = new Color(0.12f, 0.42f, 0.16f, 0.85f);
+            bush.GetComponent<Renderer>().material = mat;
         }
     }
 }

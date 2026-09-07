@@ -8,7 +8,9 @@ namespace KOA.Core.Minions
     public enum MinionType
     {
         Melee = 0,
-        Ranged = 1
+        Ranged = 1,
+        Cannon = 2,
+        Super = 3
     }
 
     /// <summary>
@@ -32,9 +34,15 @@ namespace KOA.Core.Minions
         public float MoveSpeed { get; private set; } = 5.5f;
         public float AttackRange { get; private set; }
         public float AttackCooldown { get; private set; } = 1.2f;
-        public float Radius => Type == MinionType.Melee ? 0.6f : 0.5f;
+        public float Radius => Type switch
+        {
+            MinionType.Super => 1.0f,
+            MinionType.Cannon => 0.75f,
+            MinionType.Melee => 0.6f,
+            _ => 0.5f // Ranged
+        };
 
-        public int GoldBounty { get; private set; } // 42g for Melee, 50g for Ranged (Section 4.1)
+        public int GoldBounty { get; private set; } // 42g Melee, 50g Ranged, 65g Cannon, 90g Super
         public float ExpBounty { get; private set; } = 60f;
 
         public bool IsAlive => CurrentHp > 0f;
@@ -54,29 +62,51 @@ namespace KOA.Core.Minions
             TeamId = teamId;
             Position = spawnPos;
 
-            // Evolution Scaling: +10% HP, +5% AD ทุกๆ 3 นาที (Section 3.2)
-            // (คำนวณจาก waveIndex: เวฟละ 25 วิ ดังนั้น 180 วิ / 25 วิ ~= 7 เวฟต่อ 3 นาที)
-            int evolutionStages = (waveIndex * 25) / 180;
-            float hpMultiplier = 1.0f + (evolutionStages * 0.10f);
-            float adMultiplier = 1.0f + (evolutionStages * 0.05f);
+            // Evolution Scaling: +8% HP, +4% AD ทุกๆ 2.5 นาที (150 วิ)
+            int evolutionStages = (waveIndex * 25) / 150;
+            float hpMultiplier = 1.0f + (evolutionStages * 0.08f);
+            float adMultiplier = 1.0f + (evolutionStages * 0.04f);
 
-            if (type == MinionType.Melee)
+            switch (type)
             {
-                MaxHp = 480f * hpMultiplier;
-                AttackDamage = 18f * adMultiplier;
-                Armor = 10f;
-                MagicResist = 0f;
-                AttackRange = 1.6f;
-                GoldBounty = 42;
-            }
-            else
-            {
-                MaxHp = 320f * hpMultiplier;
-                AttackDamage = 25f * adMultiplier;
-                Armor = 0f;
-                MagicResist = 0f;
-                AttackRange = 5.5f;
-                GoldBounty = 50;
+                case MinionType.Melee:
+                    MaxHp = 420f * hpMultiplier;
+                    AttackDamage = 12f * adMultiplier;
+                    Armor = 8f;
+                    MagicResist = 0f;
+                    AttackRange = 1.6f;
+                    GoldBounty = 42;
+                    ExpBounty = 55f;
+                    break;
+                case MinionType.Ranged:
+                    MaxHp = 280f * hpMultiplier;
+                    AttackDamage = 16f * adMultiplier;
+                    Armor = 0f;
+                    MagicResist = 0f;
+                    AttackRange = 5.5f;
+                    GoldBounty = 50;
+                    ExpBounty = 55f;
+                    break;
+                case MinionType.Cannon:
+                    MaxHp = 750f * hpMultiplier;
+                    AttackDamage = 35f * adMultiplier;
+                    Armor = 20f;
+                    MagicResist = 10f;
+                    AttackRange = 6.5f;
+                    AttackCooldown = 1.4f;
+                    GoldBounty = 65;
+                    ExpBounty = 80f;
+                    break;
+                case MinionType.Super:
+                    MaxHp = 1600f * hpMultiplier;
+                    AttackDamage = 75f * adMultiplier;
+                    Armor = 35f;
+                    MagicResist = 20f;
+                    AttackRange = 2.0f;
+                    AttackCooldown = 1.1f;
+                    GoldBounty = 90;
+                    ExpBounty = 120f;
+                    break;
             }
 
             CurrentHp = MaxHp;

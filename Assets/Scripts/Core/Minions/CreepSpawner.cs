@@ -17,6 +17,16 @@ namespace KOA.Core.Minions
         public Vector3 LaneDestination { get; private set; }
         public int TotalWavesSpawned { get; private set; } = 0;
 
+        /// <summary>
+        /// เมื่อทำลายป้อม 1 (Outer Tower) ของศัตรูได้ จะได้รับครีปปืนใหญ่ (Cannon Minion) เพิ่มในเวฟ
+        /// </summary>
+        public bool HasCannonMinion { get; set; } = false;
+
+        /// <summary>
+        /// เมื่อทำลายป้อม 2 (Inner Tower) ของศัตรูได้ จะได้รับ Super Creep (Boss Creep) เพิ่มในเวฟ
+        /// </summary>
+        public bool HasSuperMinion { get; set; } = false;
+
         private float _spawnTimer = 0f;
         private int _minionCounter = 0;
 
@@ -44,6 +54,8 @@ namespace KOA.Core.Minions
         {
             TotalWavesSpawned++;
             List<MinionEntity> wave = new List<MinionEntity>();
+            Vector3 backDir = (SpawnPoint - LaneDestination).normalized;
+            if (backDir.sqrMagnitude < 0.001f) backDir = TeamId == 0 ? new Vector3(0, 0, -1) : new Vector3(0, 0, 1);
 
             // 1. Melee Minion ตัวที่ 1
             _minionCounter++;
@@ -51,7 +63,7 @@ namespace KOA.Core.Minions
                 $"minion_{TeamId}_{_minionCounter}",
                 MinionType.Melee,
                 TeamId,
-                SpawnPoint + new Vector3(-0.8f, 0, 0),
+                SpawnPoint + new Vector3(-0.9f, 0, 0),
                 TotalWavesSpawned
             ));
 
@@ -61,7 +73,7 @@ namespace KOA.Core.Minions
                 $"minion_{TeamId}_{_minionCounter}",
                 MinionType.Melee,
                 TeamId,
-                SpawnPoint + new Vector3(0.8f, 0, 0),
+                SpawnPoint + new Vector3(0.9f, 0, 0),
                 TotalWavesSpawned
             ));
 
@@ -71,9 +83,35 @@ namespace KOA.Core.Minions
                 $"minion_{TeamId}_{_minionCounter}",
                 MinionType.Ranged,
                 TeamId,
-                SpawnPoint + new Vector3(0, 0, -1.2f),
+                SpawnPoint + backDir * 1.5f,
                 TotalWavesSpawned
             ));
+
+            // 4. Cannon Minion (เมื่อทำลายป้อม 1 ของศัตรูได้)
+            if (HasCannonMinion)
+            {
+                _minionCounter++;
+                wave.Add(new MinionEntity(
+                    $"minion_cannon_{TeamId}_{_minionCounter}",
+                    MinionType.Cannon,
+                    TeamId,
+                    SpawnPoint + backDir * 3.0f,
+                    TotalWavesSpawned
+                ));
+            }
+
+            // 5. Super Creep / Boss Creep (เมื่อทำลายป้อม 2 ของศัตรูได้)
+            if (HasSuperMinion)
+            {
+                _minionCounter++;
+                wave.Add(new MinionEntity(
+                    $"minion_super_{TeamId}_{_minionCounter}",
+                    MinionType.Super,
+                    TeamId,
+                    SpawnPoint + backDir * 4.5f,
+                    TotalWavesSpawned
+                ));
+            }
 
             OnWaveSpawned?.Invoke(wave);
         }

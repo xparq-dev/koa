@@ -38,8 +38,14 @@ namespace KOA.Presentation.Views
 
             if (minionRenderer != null)
             {
-                // แยกสีตามทีม: Blue (0) สีฟ้า, Red (1) สีแดง
-                minionRenderer.material.color = Logic.TeamId == 0 ? new Color(0.2f, 0.6f, 1f) : new Color(1f, 0.25f, 0.2f);
+                // แยกสีตามชนิดและทีม:
+                Color baseColor = Logic.TeamId == 0 
+                    ? (Logic.Type == MinionType.Super ? new Color(0.35f, 0.2f, 0.85f) :
+                       Logic.Type == MinionType.Cannon ? new Color(0.2f, 0.85f, 0.85f) : new Color(0.2f, 0.6f, 1f))
+                    : (Logic.Type == MinionType.Super ? new Color(0.75f, 0.05f, 0.25f) :
+                       Logic.Type == MinionType.Cannon ? new Color(0.95f, 0.55f, 0.1f) : new Color(1f, 0.25f, 0.2f));
+
+                minionRenderer.material.color = baseColor;
             }
 
             if (healthBar != null)

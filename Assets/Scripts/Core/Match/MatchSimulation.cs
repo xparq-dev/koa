@@ -49,23 +49,24 @@ namespace KOA.Core.Match
         public event Action<TowerEntity> OnTowerDestroyed;
         public event Action<string> OnKillFeedMessage;
 
-        // ตำแหน่ง Fountain Zone (Section 3.1: รัศมี 8m, HP/Mana Regen 20%/sec)
+        // ตำแหน่ง Fountain Zone (Section 3.1: รัศมี 7.5m, HP/Mana Regen ~11%/sec แบบ LoL)
         public Vector3 BlueFountainPos { get; private set; }
         public Vector3 RedFountainPos { get; private set; }
-        public const float FountainZoneRadius = 8.0f;
+        public const float FountainZoneRadius = 7.5f;
 
         public MatchSimulation(Vector3 blueFountainPos, Vector3 redFountainPos)
         {
-            // สร้างป้อมปราการฝั่ง Blue (Z ติดลบ)
-            BlueOuterTower = new TowerEntity("blue_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, -16f), 0);
-            BlueInnerTower = new TowerEntity("blue_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, -24f), 0);
-            BlueNexus = new TowerEntity("blue_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, -30f), 0);
+            // สร้างป้อมปราการฝั่ง Blue (แผนที่ 130m: Z = -65 ถึง +65)
+            // Outer Tower: -14m, Inner Tower: -32m (ห่าง 18m), Nexus: -46m (ห่าง 14m), Fountain: -60m (ห่าง 14m)
+            BlueOuterTower = new TowerEntity("blue_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, -14f), 0);
+            BlueInnerTower = new TowerEntity("blue_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, -32f), 0);
+            BlueNexus = new TowerEntity("blue_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, -46f), 0);
             BlueTowers.AddRange(new[] { BlueOuterTower, BlueInnerTower, BlueNexus });
 
-            // สร้างป้อมปราการฝั่ง Red (Z เป็นบวก)
-            RedOuterTower = new TowerEntity("red_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, 16f), 1);
-            RedInnerTower = new TowerEntity("red_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, 24f), 1);
-            RedNexus = new TowerEntity("red_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, 30f), 1);
+            // สร้างป้อมปราการฝั่ง Red (แผนที่ 130m)
+            RedOuterTower = new TowerEntity("red_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, 14f), 1);
+            RedInnerTower = new TowerEntity("red_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, 32f), 1);
+            RedNexus = new TowerEntity("red_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, 46f), 1);
             RedTowers.AddRange(new[] { RedOuterTower, RedInnerTower, RedNexus });
 
             // ตั้งค่า Damage Immunity ตามลำดับ (Section 3.3)
@@ -99,16 +100,18 @@ namespace KOA.Core.Match
             {
                 BlueInnerTower.IsInvulnerable = false;
                 RedWallet.AddGold(StructureStats.CreateTier1OuterTower().GoldBounty);
+                RedSpawner.HasCannonMinion = true; // Red ได้ Cannon Minion
                 OnTowerDestroyed?.Invoke(BlueOuterTower);
-                OnKillFeedMessage?.Invoke("Blue Outer Tower has been destroyed!");
+                OnKillFeedMessage?.Invoke("Blue Outer Tower destroyed! Red Team now deploys Cannon Minions!");
             };
 
             BlueInnerTower.OnDestroyed += () =>
             {
                 BlueNexus.IsInvulnerable = false;
                 RedWallet.AddGold(StructureStats.CreateTier2InnerTower().GoldBounty);
+                RedSpawner.HasSuperMinion = true; // Red ได้ Super Creep
                 OnTowerDestroyed?.Invoke(BlueInnerTower);
-                OnKillFeedMessage?.Invoke("Blue Inner Tower has been destroyed! The Nexus is vulnerable!");
+                OnKillFeedMessage?.Invoke("Blue Inner Tower destroyed! Red Team now deploys Super Creeps!");
             };
 
             BlueNexus.OnDestroyed += () =>
@@ -121,16 +124,18 @@ namespace KOA.Core.Match
             {
                 RedInnerTower.IsInvulnerable = false;
                 BlueWallet.AddGold(StructureStats.CreateTier1OuterTower().GoldBounty);
+                BlueSpawner.HasCannonMinion = true; // Blue ได้ Cannon Minion
                 OnTowerDestroyed?.Invoke(RedOuterTower);
-                OnKillFeedMessage?.Invoke("Red Outer Tower has been destroyed!");
+                OnKillFeedMessage?.Invoke("Red Outer Tower destroyed! Blue Team now deploys Cannon Minions!");
             };
 
             RedInnerTower.OnDestroyed += () =>
             {
                 RedNexus.IsInvulnerable = false;
                 BlueWallet.AddGold(StructureStats.CreateTier2InnerTower().GoldBounty);
+                BlueSpawner.HasSuperMinion = true; // Blue ได้ Super Creep
                 OnTowerDestroyed?.Invoke(RedInnerTower);
-                OnKillFeedMessage?.Invoke("Red Inner Tower has been destroyed! The Nexus is vulnerable!");
+                OnKillFeedMessage?.Invoke("Red Inner Tower destroyed! Blue Team now deploys Super Creeps!");
             };
 
             RedNexus.OnDestroyed += () =>

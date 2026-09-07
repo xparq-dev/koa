@@ -78,17 +78,23 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 
 ## 3. แผนที่ 1v1 Duel Arena (ใหม่ทั้งหมด — แทนที่ Section 7 เดิม)
 
-### 3.1 ขนาดและโครงสร้าง
+### 3.1 ขนาดและโครงสร้าง (อัปเดต 130m Scale)
 - **รูปแบบ:** เลนเดียว แนวยาว (Corridor) เชื่อม Fountain ทั้งสองฝั่ง
-- **ขนาดสนามโดยประมาณ:** ยาว 70 เมตร x กว้าง 20 เมตร (1 Grid Unit = 1 เมตร ตามที่กำหนดไว้เดิม)
-- **Fountain Zone:** รัศมี 8 เมตร ที่ปลายแมพแต่ละฝั่ง มี HP/Mana regen สูงมาก (heal 20% Max HP/sec) และ invulnerability เมื่ออยู่ในโซน
-- **Bush/พุ่มหญ้า:** วางไว้ 2 จุด สมมาตรกันบริเวณกึ่งกลางเลน (ไม่ใช่ป่าเต็มรูปแบบ) ใช้กลไก Fog of War brush เดิมจาก section 7.2 ของเอกสารต้นฉบับ (เปิดเผยตำแหน่งเมื่อโจมตีจากในพุ่ม 3.0 วินาที)
-- **ไม่มี Jungle Camp / Neutral Monster** ใน 1.0.0 ตามที่ตัดสินใจไว้ — ออกแบบ layout ให้เหลือพื้นที่ว่างสองข้างเลนไว้เผื่อใส่ป่าใน Phase หลัง (รักษาความเป็นไปได้ในการขยาย)
+- **ขนาดสนามโดยประมาณ:** ยาว 130 เมตร x กว้าง 26 เมตร (1 Grid Unit = 1 เมตร)
+  - Blue Fountain: Z = -60m, Blue Nexus: Z = -46m, Blue Inner Tower: Z = -32m, Blue Outer Tower: Z = -14m
+  - Red Outer Tower: Z = +14m, Red Inner Tower: Z = +32m, Red Nexus: Z = +46m, Red Fountain: Z = +60m
+  - พื้นที่ปะทะกลางเลน (Center Clash Zone): ระหว่าง Outer Towers กว้าง 28 เมตร (Z = -14m ถึง +14m)
+- **Fountain Zone:** รัศมี 7.5 เมตร อยู่ด้านหลัง Nexus แต่ละฝั่ง มี HP/Mana regen แบบ LoL (~11% Max HP-MP/sec ใช้เวลาประมาณ 8-10 วินาทีเต็มหลอด) และ invulnerability
+- **Bush/พุ่มหญ้า:** วางไว้ 2 จุด สมมาตรกันบริเวณกึ่งกลางเลน (X = -8m และ X = +8m, Z = -4m ถึง +4m)
+- **ไม่มี Jungle Camp / Neutral Monster** ใน 1.0.0
 
-### 3.2 Creep Spawner (ปรับจาก Section 7.1 เดิม)
-- **ความถี่:** ทุก 25.0 วินาที (ลดจาก 30 วิเดิม เพราะมีเลนเดียว ต้องการจังหวะฟาร์มที่กระชับขึ้น)
-- **รูปแบบเวฟ:** 2 Melee Minion + 1 Ranged Minion ต่อเวฟ (คงเดิม)
-- **Evolution Scaling:** คงสูตรเดิม +10% Max HP / +5% AD ทุก 3 นาที
+### 3.2 Creep Spawner & Escalation (อัปเดตระบบป้อมแตก)
+- **ความถี่:** ทุก 25.0 วินาที
+- **รูปแบบเวฟพื้นฐาน:** 2 Melee Minion + 1 Ranged Minion ต่อเวฟ
+- **Tower Escalation Advantage (ระบบความได้เปรียบเมื่อทำลายป้อม):**
+  - **เมื่อทำลาย Outer Tower ศัตรูสำเร็จ:** เวฟของฝั่งเราจะได้รับ **Cannon Minion (ครีปปืนใหญ่)** เพิ่ม 1 ตัวต่อเวฟ (ยิงไกล 6.5m, HP สูง, ตีหนัก)
+  - **เมื่อทำลาย Inner Tower ศัตรูสำเร็จ:** เวฟของฝั่งเราจะได้รับ **Super Creep (Boss Creep)** เพิ่ม 1 ตัวต่อเวฟ (ตัวใหญ่ เลือดมหาศาล 1600+ HP, ตีป้อมรุนแรง)
+- **Evolution Scaling:** +8% Max HP / +4% AD ทุก 2.5 นาที (150 วินาที)
 
 ### 3.3 โครงสร้างป้อมปราการ (แทนที่ Section 8 เดิม — ลดจาก 3 tier เหลือ 2 tier)
 
