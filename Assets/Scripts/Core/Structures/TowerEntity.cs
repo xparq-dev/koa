@@ -1,3 +1,4 @@
+using KOA.Core.Entities;
 using KOA.Data.Enums;
 using KOA.Data.Models;
 using System;
@@ -7,16 +8,22 @@ namespace KOA.Core.Structures
 {
     /// <summary>
     /// Simulation Core สำหรับป้อมปราการและ Nexus ตาม Section 3.3
-    /// คำนวณ Heating Laser, Tower Plating, และ AoE Slow ใน Simulation Tick 30 FPS
+    /// คำนวณ Heating Laser, Tower Plating, และ AoE Slow ใน Simulation Tick 30 FPS (Decoupled Core)
     /// </summary>
-    public class TowerEntity
+    public class TowerEntity : ITargetable
     {
         public string TowerId { get; private set; }
+        public string TargetId => TowerId;
         public StructureStats Stats { get; private set; }
         public Vector3 Position { get; set; }
         public float CurrentHp { get; private set; }
+        public float MaxHp => Stats.MaxHp;
         public bool IsDestroyed => CurrentHp <= 0f;
+        public bool IsAlive => !IsDestroyed;
         public bool IsInvulnerable { get; set; }
+        public bool IsBackdoorProtectionActive { get; set; } = false;
+        public int TeamId { get; set; } = 0; // 0 = Blue, 1 = Red
+        public float Radius => 1.5f;
 
         // สถานะการยิงและการล็อคเป้า
         private float _fireCooldownRemaining = 0f;
@@ -40,15 +47,17 @@ namespace KOA.Core.Structures
 
         // Events สำหรับ Presentation Layer (VFX ลำแสงเลเซอร์, เสียงยิง, UI เลือด)
         public event Action<float, float> OnHealthChanged;
+        public event Action<float, DamageType> OnDamageTaken;
         public event Action<Vector3, float, bool> OnAttackFired; // targetPos, damage, isHeatingLaser
         public event Action OnDestroyed;
 
-        public TowerEntity(string towerId, StructureStats stats, Vector3 position)
+        public TowerEntity(string towerId, StructureStats stats, Vector3 position, int teamId = 0)
         {
             TowerId = towerId;
             Stats = stats;
             Position = position;
             CurrentHp = stats.MaxHp;
+            TeamId = teamId;
             IsInvulnerable = stats.RequiresTier2Destroyed; // Nexus จะเริ่มด้วย Invulnerable
         }
 
@@ -64,7 +73,7 @@ namespace KOA.Core.Structures
                 _fireCooldownRemaining = Mathf.Max(0f, _fireCooldownRemaining - deltaTime);
             }
 
-            // Nexus HP Regen นอกการต่อสู้ (Section 3.3)
+            // Nexus HP Regen เมื่ออยู่นอกการต่อสู้ (Section 3.3)
             if (Stats.HpRegenerationOutOfCombat > 0f && CurrentHp < Stats.MaxHp)
             {
                 CurrentHp = Mathf.Min(Stats.MaxHp, CurrentHp + (Stats.HpRegenerationOutOfCombat * deltaTime));
@@ -73,7 +82,7 @@ namespace KOA.Core.Structures
         }
 
         /// <summary>
-        /// ตรวจสอบและทำการยิงเป้าหมายตามกลไก Heating Laser (Section 3.3)
+        /// ตรรกะการยิงเป้าหมายพร้อมระบบตัวคูณดาเมจ Heating Laser (Section 3.3)
         /// </summary>
         public bool TryAttackTarget(string targetId, Vector3 targetPosition, Action<float, DamageType> applyDamageCallback)
         {
@@ -126,7 +135,7 @@ namespace KOA.Core.Structures
             _consecutiveHitsOnTarget = 0;
         }
 
-        public void TakeDamage(float rawDamage, DamageType damageType)
+        public void TakeDamage(float rawDamage, DamageType damageType, string attackerId = null)
         {
             if (IsDestroyed || IsInvulnerable) return;
 
@@ -142,7 +151,14 @@ namespace KOA.Core.Structures
                 netDamage = rawDamage * (1f - reduction);
             }
 
+            // Anti-Backdoor Protection: ลดดาเมจ 70% หากไม่มีมิเนียนฝ่ายตรงข้ามอยู่ในรัศมีป้อม
+            if (IsBackdoorProtectionActive)
+            {
+                netDamage *= 0.30f;
+            }
+
             CurrentHp = Mathf.Max(0f, CurrentHp - netDamage);
+            OnDamageTaken?.Invoke(netDamage, damageType);
             OnHealthChanged?.Invoke(CurrentHp, Stats.MaxHp);
 
             if (CurrentHp <= 0f)

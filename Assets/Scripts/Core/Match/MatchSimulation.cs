@@ -10,8 +10,8 @@ using UnityEngine;
 namespace KOA.Core.Match
 {
     /// <summary>
-    /// ตัวจำลองการแข่งขัน 1v1 ตลอดทั้งแมตช์ (Simulation Core)
-    /// ควบคุมป้อมปราการ 2 Tier + Nexus (Section 3.3), ครีป (Section 3.2), เศรษฐกิจ (Section 4), และการตัดสินผลชนะ
+    /// ผู้จัดการจำลองแมตช์ 1v1 ในระดับสนามแข่งขัน (Simulation Core)
+    /// ควบคุมป้อมปราการ 2 Tier + Nexus (Section 3.3), ครีป (Section 3.2), ระบบต่อสู้, เศรษฐกิจ (Section 4), และการตัดสินผลแพ้ชนะ
     /// </summary>
     public class MatchSimulation
     {
@@ -19,20 +19,26 @@ namespace KOA.Core.Match
         public int WinningTeam { get; private set; } = -1; // 0 = Blue, 1 = Red
         public float MatchTime { get; private set; } = 0f;
 
-        // โครงสร้างป้อมปราการฝั่ง Blue (ทีม 0)
+        // ป้อมปราการและฐานฝั่ง Blue (ทีม 0)
         public TowerEntity BlueOuterTower { get; private set; }
         public TowerEntity BlueInnerTower { get; private set; }
         public TowerEntity BlueNexus { get; private set; }
+        public List<TowerEntity> BlueTowers { get; private set; } = new List<TowerEntity>();
 
-        // โครงสร้างป้อมปราการฝั่ง Red (ทีม 1)
+        // ป้อมปราการและฐานฝั่ง Red (ทีม 1)
         public TowerEntity RedOuterTower { get; private set; }
         public TowerEntity RedInnerTower { get; private set; }
         public TowerEntity RedNexus { get; private set; }
+        public List<TowerEntity> RedTowers { get; private set; } = new List<TowerEntity>();
 
         // Creep Spawners
         public CreepSpawner BlueSpawner { get; private set; }
         public CreepSpawner RedSpawner { get; private set; }
         public List<MinionEntity> ActiveMinions { get; private set; } = new List<MinionEntity>();
+
+        // ฮีโร่ในสนามแข่งขัน (Section 1.1)
+        public HeroBase3D BlueHero { get; set; }
+        public HeroBase3D RedHero { get; set; }
 
         // กระเป๋าเงินผู้เล่น
         public PlayerWallet BlueWallet { get; private set; }
@@ -43,17 +49,24 @@ namespace KOA.Core.Match
         public event Action<TowerEntity> OnTowerDestroyed;
         public event Action<string> OnKillFeedMessage;
 
+        // ตำแหน่ง Fountain Zone (Section 3.1: รัศมี 8m, HP/Mana Regen 20%/sec)
+        public Vector3 BlueFountainPos { get; private set; }
+        public Vector3 RedFountainPos { get; private set; }
+        public const float FountainZoneRadius = 8.0f;
+
         public MatchSimulation(Vector3 blueFountainPos, Vector3 redFountainPos)
         {
             // สร้างป้อมปราการฝั่ง Blue (Z ติดลบ)
-            BlueOuterTower = new TowerEntity("blue_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, -10f));
-            BlueInnerTower = new TowerEntity("blue_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, -20f));
-            BlueNexus = new TowerEntity("blue_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, -30f));
+            BlueOuterTower = new TowerEntity("blue_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, -16f), 0);
+            BlueInnerTower = new TowerEntity("blue_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, -24f), 0);
+            BlueNexus = new TowerEntity("blue_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, -30f), 0);
+            BlueTowers.AddRange(new[] { BlueOuterTower, BlueInnerTower, BlueNexus });
 
             // สร้างป้อมปราการฝั่ง Red (Z เป็นบวก)
-            RedOuterTower = new TowerEntity("red_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, 10f));
-            RedInnerTower = new TowerEntity("red_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, 20f));
-            RedNexus = new TowerEntity("red_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, 30f));
+            RedOuterTower = new TowerEntity("red_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, 16f), 1);
+            RedInnerTower = new TowerEntity("red_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, 24f), 1);
+            RedNexus = new TowerEntity("red_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, 30f), 1);
+            RedTowers.AddRange(new[] { RedOuterTower, RedInnerTower, RedNexus });
 
             // ตั้งค่า Damage Immunity ตามลำดับ (Section 3.3)
             BlueInnerTower.IsInvulnerable = true;
@@ -73,6 +86,10 @@ namespace KOA.Core.Match
             // สร้าง Wallet
             BlueWallet = new PlayerWallet();
             RedWallet = new PlayerWallet();
+
+            // เก็บตำแหน่ง Fountain
+            BlueFountainPos = blueFountainPos;
+            RedFountainPos = redFountainPos;
         }
 
         private void HookTowerEvents()
@@ -133,13 +150,18 @@ namespace KOA.Core.Match
 
         private void HandleMinionKilled(MinionEntity minion, string killerId)
         {
-            if (killerId == "player_blue")
+            if (killerId != null)
             {
-                BlueWallet.AddGold(minion.GoldBounty);
-            }
-            else if (killerId == "player_red")
-            {
-                RedWallet.AddGold(minion.GoldBounty);
+                if (killerId.Contains("blue") || (BlueHero != null && killerId == BlueHero.HeroId))
+                {
+                    BlueWallet.AddGold(minion.GoldBounty);
+                    BlueHero?.AddExp(minion.ExpBounty);
+                }
+                else if (killerId.Contains("red") || (RedHero != null && killerId == RedHero.HeroId))
+                {
+                    RedWallet.AddGold(minion.GoldBounty);
+                    RedHero?.AddExp(minion.ExpBounty);
+                }
             }
         }
 
@@ -153,7 +175,7 @@ namespace KOA.Core.Match
             BlueWallet.SimulationTick(deltaTime);
             RedWallet.SimulationTick(deltaTime);
 
-            // อัปเดตป้อมปราการ
+            // อัปเดตป้อมปราการและการคำนวณ Cooldown
             BlueOuterTower.SimulationTick(deltaTime);
             BlueInnerTower.SimulationTick(deltaTime);
             BlueNexus.SimulationTick(deltaTime);
@@ -166,7 +188,16 @@ namespace KOA.Core.Match
             BlueSpawner.SimulationTick(deltaTime);
             RedSpawner.SimulationTick(deltaTime);
 
-            // อัปเดตมินเนี่ยนที่ยังมีชีวิต
+            // 1. Tower Defense Targeting & Backdoor Protection (Section 3.3)
+            UpdateBackdoorProtection(BlueTowers, 1);
+            UpdateBackdoorProtection(RedTowers, 0);
+            UpdateTowerCombat(BlueTowers, 1);
+            UpdateTowerCombat(RedTowers, 0);
+
+            // 3. Fountain Zone HP/Mana Regen (Section 3.1: 20% MaxHP/sec)
+            UpdateFountainZoneRegen(deltaTime);
+
+            // 4. Minion Combat & Movement Loop (Section 3.2)
             for (int i = ActiveMinions.Count - 1; i >= 0; i--)
             {
                 var minion = ActiveMinions[i];
@@ -176,8 +207,155 @@ namespace KOA.Core.Match
                     continue;
                 }
 
+                int enemyTeam = minion.TeamId == 0 ? 1 : 0;
+
+                // ค้นหาเป้าหมายศัตรูหากยังไม่มีเป้าหมาย หรือเป้าหมายเดิมตาย/หลุดระยะ
+                if (minion.CurrentTarget == null || !minion.CurrentTarget.IsAlive || Vector3.Distance(minion.Position, minion.CurrentTarget.Position) > 8.0f)
+                {
+                    ITargetable target = null;
+                    float minDistance = float.MaxValue;
+
+                    // 2.1 ค้นหาครีบศัตรูในระยะ Aggro (7.0m)
+                    for (int j = 0; j < ActiveMinions.Count; j++)
+                    {
+                        var other = ActiveMinions[j];
+                        if (other.IsAlive && other.TeamId == enemyTeam)
+                        {
+                            float dist = Vector3.Distance(minion.Position, other.Position);
+                            if (dist <= 7.0f && dist < minDistance)
+                            {
+                                minDistance = dist;
+                                target = other;
+                            }
+                        }
+                    }
+
+                    // 2.2 หากไม่มีครีบศัตรู ให้ค้นหาป้อมศัตรูที่สามารถโจมตีได้
+                    if (target == null)
+                    {
+                        var enemyTowers = enemyTeam == 0 ? BlueTowers : RedTowers;
+                        foreach (var tow in enemyTowers)
+                        {
+                            if (!tow.IsDestroyed && !tow.IsInvulnerable)
+                            {
+                                float dist = Vector3.Distance(minion.Position, tow.Position);
+                                if (dist <= 7.0f && dist < minDistance)
+                                {
+                                    minDistance = dist;
+                                    target = tow;
+                                }
+                            }
+                        }
+                    }
+
+                    // 2.3 หากไม่มีป้อม ให้ค้นหาฮีโร่ศัตรู
+                    if (target == null)
+                    {
+                        var enemyHero = enemyTeam == 0 ? BlueHero : RedHero;
+                        if (enemyHero != null && enemyHero.IsAlive)
+                        {
+                            float dist = Vector3.Distance(minion.Position, enemyHero.Position);
+                            if (dist <= 6.0f)
+                            {
+                                target = enemyHero;
+                            }
+                        }
+                    }
+
+                    minion.SetTarget(target);
+                }
+
                 Vector3 targetDest = minion.TeamId == 0 ? RedNexus.Position : BlueNexus.Position;
                 minion.SimulationTick(deltaTime, targetDest);
+            }
+        }
+
+        private void UpdateFountainZoneRegen(float deltaTime)
+        {
+            if (BlueHero != null && BlueHero.IsAlive)
+            {
+                bool inFountain = Vector3.Distance(BlueHero.Position, BlueFountainPos) <= FountainZoneRadius;
+                BlueHero.IsInFountainZone = inFountain;
+                if (inFountain) BlueHero.FountainZoneTick(deltaTime);
+            }
+            if (RedHero != null && RedHero.IsAlive)
+            {
+                bool inFountain = Vector3.Distance(RedHero.Position, RedFountainPos) <= FountainZoneRadius;
+                RedHero.IsInFountainZone = inFountain;
+                if (inFountain) RedHero.FountainZoneTick(deltaTime);
+            }
+        }
+
+        private void UpdateTowerCombat(List<TowerEntity> towers, int enemyTeam)
+        {
+            foreach (var tower in towers)
+            {
+                if (tower.IsDestroyed || tower.Stats.BaseAttackDamage <= 0f) continue;
+
+                ITargetable bestTarget = null;
+                float closestDist = float.MaxValue;
+
+                // Priority 1: ครีบศัตรูที่ใกล้ที่สุดในระยะป้อม
+                for (int m = 0; m < ActiveMinions.Count; m++)
+                {
+                    var minion = ActiveMinions[m];
+                    if (minion.IsAlive && minion.TeamId == enemyTeam)
+                    {
+                        float d = Vector3.Distance(tower.Position, minion.Position);
+                        if (d <= tower.Stats.AttackRange && d < closestDist)
+                        {
+                            closestDist = d;
+                            bestTarget = minion;
+                        }
+                    }
+                }
+
+                // Priority 2: ฮีโร่ศัตรู หากไม่มีครีบศัตรูในระยะ
+                if (bestTarget == null)
+                {
+                    var enemyHero = enemyTeam == 0 ? BlueHero : RedHero;
+                    if (enemyHero != null && enemyHero.IsAlive)
+                    {
+                        float d = Vector3.Distance(tower.Position, enemyHero.Position);
+                        if (d <= tower.Stats.AttackRange)
+                        {
+                            bestTarget = enemyHero;
+                        }
+                    }
+                }
+
+                if (bestTarget != null)
+                {
+                    tower.TryAttackTarget(bestTarget.TargetId, bestTarget.Position, (dmg, type) =>
+                    {
+                        bestTarget.TakeDamage(dmg, type, tower.TowerId);
+                    });
+                }
+            }
+        }
+
+        private void UpdateBackdoorProtection(List<TowerEntity> towers, int enemyTeam)
+        {
+            for (int i = 0; i < towers.Count; i++)
+            {
+                var tower = towers[i];
+                if (tower == null || tower.IsDestroyed) continue;
+
+                bool enemyCreepsNearby = false;
+                float protectionRange = tower.Stats.AttackRange + 2.0f;
+                for (int j = 0; j < ActiveMinions.Count; j++)
+                {
+                    var m = ActiveMinions[j];
+                    if (m.IsAlive && m.TeamId == enemyTeam)
+                    {
+                        if (Vector3.Distance(m.Position, tower.Position) <= protectionRange)
+                        {
+                            enemyCreepsNearby = true;
+                            break;
+                        }
+                    }
+                }
+                tower.IsBackdoorProtectionActive = !enemyCreepsNearby;
             }
         }
 

@@ -1,3 +1,4 @@
+using KOA.Core.Minions;
 using KOA.Data.Enums;
 using System;
 using UnityEngine;
@@ -20,6 +21,12 @@ namespace KOA.Core.Entities
         public const float Skill2ManaCost = 80.0f;
         public const float Skill2Radius = 4.0f;
 
+        // Skill 3: Graviton Well (Section 6.4 E)
+        public const float Skill3CooldownDuration = 10.0f;
+        public const float Skill3ManaCost = 75.0f;
+        public const float Skill3Range = 6.0f;
+        public const float Skill3Radius = 3.5f;
+
         public const float UltimateCooldownDuration = 110.0f;
         public const float UltimateManaCost = 150.0f;
         public const float UltimateRange = 7.5f;
@@ -30,15 +37,18 @@ namespace KOA.Core.Entities
         public float CurrentShield { get; private set; } = 0f;
         public float Skill1CooldownRemaining { get; private set; } = 0f;
         public float Skill2CooldownRemaining { get; private set; } = 0f;
+        public float Skill3CooldownRemaining { get; private set; } = 0f;
         public float UltimateCooldownRemaining { get; private set; } = 0f;
+        public float AttackCooldownRemaining { get; private set; } = 0f;
+        public float BaseAttackCooldown { get; set; } = 1.2f; // Tank — โจมตีเร็ว เพราะเข้าใกล้และเป็น Melee
 
         // Navigation
         public Vector3 TargetDestination { get; private set; }
-        public bool IsMoving { get; private set; }
 
         // Events
         public event Action<Vector3> OnMagneticPullCast;
         public event Action<float> OnRepulsionZoneCast;
+        public event Action<Vector3, float, bool> OnGravitonWellCast;
         public event Action<Vector3, float> OnGravityCollapseCast;
 
         public GravitorHero(Vector3 spawnPosition) : base(
@@ -48,7 +58,7 @@ namespace KOA.Core.Entities
             baseMana: 240f,
             baseArmor: 42f,
             baseMr: 36f,
-            baseAd: 58f,
+            baseAd: 48f,
             baseSpeed: 6.9f,
             attackRange: 2.0f,
             statGrowth: HeroStatGrowth.GetGrowthFor("Gravitor")
@@ -71,26 +81,53 @@ namespace KOA.Core.Entities
             TargetDestination = Position;
         }
 
+        public override bool TryBasicAttack(ITargetable target)
+        {
+            if (!IsAlive || target == null || !target.IsAlive) return false;
+            if (target.TeamId == TeamId && target.TeamId != -1) return false;
+
+            float distance = Vector3.Distance(Position, target.Position);
+            if (distance > (AttackRange + target.Radius)) return false;
+            if (AttackCooldownRemaining > 0f) return false;
+
+            Vector3 lookDir = (target.Position - Position).normalized;
+            if (lookDir.sqrMagnitude > 0.001f)
+            {
+                Rotation = Quaternion.LookRotation(new Vector3(lookDir.x, 0, lookDir.z));
+            }
+
+            target.TakeDamage(EffectiveAttackDamage, DamageType.Magic, HeroId);
+            AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
+            return true;
+        }
+
+        public bool TryBasicAttack(DummyTarget target) => TryBasicAttack((ITargetable)target);
+
         /// <summary>
         /// Skill 1: Magnetic Pull (SINGLE_TARGET / Aim) Section 6.4 & 6.5
         /// ดึงเป้าหมายเข้าหาตัว Gravitor
         /// </summary>
-        public bool TryCastMagneticPull(Vector3 aimWorldPos, DummyTarget dummyTarget)
+        public bool TryCastMagneticPull(Vector3 aimWorldPos, ITargetable target = null)
         {
-            if (!IsAlive || Skill1CooldownRemaining > 0f) return false;
+            if (!IsAlive || Skill1Rank <= 0 || Skill1CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill1ManaCost)) return false;
 
-            Skill1CooldownRemaining = Skill1CooldownDuration;
+            Skill1CooldownRemaining = Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 1.0f);
 
-            if (dummyTarget != null && dummyTarget.IsAlive)
+            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
-                float dist = Vector3.Distance(Position, dummyTarget.Position);
+                float dist = Vector3.Distance(Position, target.Position);
                 if (dist <= Skill1Range)
                 {
                     // ดึงเป้าหมายมาอยู่ตรงหน้า Gravitor (ระยะ 1.8m)
                     Vector3 pullDest = Position + (Rotation * Vector3.forward * 1.8f);
-                    dummyTarget.Position = pullDest;
-                    dummyTarget.TakeDamage(100f + (EffectiveAttackDamage * 0.5f), DamageType.Magic);
+                    if (target is DummyTarget dt) dt.Position = pullDest;
+                    else if (target is MinionEntity me) me.Position = pullDest;
+                    else if (target is HeroBase3D hb) hb.Position = pullDest;
+
+                    float baseDmg = 65f + (Skill1Rank - 1) * 45f;
+                    float damage = baseDmg + (EffectiveAttackDamage * 0.45f);
+                    target.TakeDamage(damage, DamageType.Magic, HeroId);
                 }
             }
 
@@ -98,25 +135,33 @@ namespace KOA.Core.Entities
             return true;
         }
 
+        public bool TryCastMagneticPull(Vector3 aimWorldPos, DummyTarget dummyTarget) => TryCastMagneticPull(aimWorldPos, (ITargetable)dummyTarget);
+
         /// <summary>
         /// Skill 2: Repulsion Zone (SELF_CAST) Section 6.4 & 6.5
         /// ผลักศัตรูรอบตัวออกในระยะ 4m
         /// </summary>
-        public bool TryCastRepulsionZone(DummyTarget dummyTarget)
+        public bool TryCastRepulsionZone(ITargetable target = null)
         {
-            if (!IsAlive || Skill2CooldownRemaining > 0f) return false;
+            if (!IsAlive || Skill2Rank <= 0 || Skill2CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill2ManaCost)) return false;
 
-            Skill2CooldownRemaining = Skill2CooldownDuration;
+            Skill2CooldownRemaining = Mathf.Max(7.0f, Skill2CooldownDuration - (Skill2Rank - 1) * 1.0f);
 
-            if (dummyTarget != null && dummyTarget.IsAlive)
+            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
-                float dist = Vector3.Distance(Position, dummyTarget.Position);
+                float dist = Vector3.Distance(Position, target.Position);
                 if (dist <= Skill2Radius)
                 {
-                    Vector3 pushDir = (dummyTarget.Position - Position).normalized;
-                    dummyTarget.Position += pushDir * 2.5f; // ผลักออกไป 2.5m
-                    dummyTarget.TakeDamage(120f + (EffectiveAttackDamage * 0.6f), DamageType.Magic);
+                    Vector3 pushDir = (target.Position - Position).normalized;
+                    Vector3 pushDest = target.Position + pushDir * 2.5f;
+                    if (target is DummyTarget dt) dt.Position = pushDest;
+                    else if (target is MinionEntity me) me.Position = pushDest;
+                    else if (target is HeroBase3D hb) hb.Position = pushDest;
+
+                    float baseDmg = 70f + (Skill2Rank - 1) * 45f;
+                    float damage = baseDmg + (EffectiveAttackDamage * 0.5f);
+                    target.TakeDamage(damage, DamageType.Magic, HeroId);
                 }
             }
 
@@ -124,27 +169,78 @@ namespace KOA.Core.Entities
             return true;
         }
 
+        public bool TryCastRepulsionZone(DummyTarget dummyTarget) => TryCastRepulsionZone((ITargetable)dummyTarget);
+
+        /// <summary>
+        /// Skill 3: Graviton Well (GROUND_TARGET_AOE) Section 6.4 E
+        /// วางบ่อแรงโน้มถ่วงบนพื้นรัศมี 3.5m ทำเวทดาเมจและ Slow ศัตรู
+        /// </summary>
+        public bool TryCastGravitonWell(Vector3 groundPos, System.Collections.Generic.IEnumerable<ITargetable> targets = null)
+        {
+            if (!IsAlive || Skill3Rank <= 0 || Skill3CooldownRemaining > 0f) return false;
+            if (!TryConsumeMana(Skill3ManaCost)) return false;
+
+            float cd = Mathf.Max(6.0f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f);
+            Skill3CooldownRemaining = cd;
+
+            Vector3 toGround = groundPos - Position;
+            toGround.y = 0;
+            float dist = Mathf.Min(toGround.magnitude, Skill3Range);
+            Vector3 center = dist > 0.1f ? Position + (toGround.normalized * dist) : Position;
+
+            bool hit = false;
+            float baseDmg = 75f + (Skill3Rank - 1) * 45f;
+            float damage = baseDmg + (EffectiveAttackDamage * 0.50f);
+
+            if (targets != null)
+            {
+                foreach (var t in targets)
+                {
+                    if (t != null && t.IsAlive && (t.TeamId != TeamId || t.TeamId == -1))
+                    {
+                        float d = Vector3.Distance(center, t.Position);
+                        if (d <= Skill3Radius + t.Radius)
+                        {
+                            hit = true;
+                            t.TakeDamage(damage, DamageType.Magic, HeroId);
+                        }
+                    }
+                }
+            }
+
+            OnGravitonWellCast?.Invoke(center, Skill3Radius, hit);
+            return true;
+        }
+
+        public bool TryCastGravitonWell(Vector3 groundPos, ITargetable target) => TryCastGravitonWell(groundPos, target != null ? new[] { target } : null);
+        public bool TryCastGravitonWell(Vector3 groundPos, DummyTarget dummyTarget) => TryCastGravitonWell(groundPos, (ITargetable)dummyTarget);
+
         /// <summary>
         /// Ultimate: Gravity Kore Collapse (GROUND_TARGET_AOE) Section 6.4
         /// สร้างหลุมดำดูดเป้าหมายและระเบิด
         /// </summary>
-        public bool TryCastGravityCollapse(Vector3 groundPos, DummyTarget dummyTarget)
+        public bool TryCastGravityCollapse(Vector3 groundPos, ITargetable target = null)
         {
-            if (!IsAlive || UltimateCooldownRemaining > 0f) return false;
+            if (!IsAlive || UltimateRank <= 0 || UltimateCooldownRemaining > 0f) return false;
             if (!TryConsumeMana(UltimateManaCost)) return false;
 
-            UltimateCooldownRemaining = UltimateCooldownDuration;
+            UltimateCooldownRemaining = 120f - (UltimateRank * 15f);
 
             Vector3 center = groundPos;
             center.y = Position.y;
 
-            if (dummyTarget != null && dummyTarget.IsAlive)
+            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
-                float dist = Vector3.Distance(center, dummyTarget.Position);
+                float dist = Vector3.Distance(center, target.Position);
                 if (dist <= UltimateRadius)
                 {
-                    dummyTarget.Position = center; // ดูดเข้ากึ่งกลาง
-                    dummyTarget.TakeDamage(280f + EffectiveAttackDamage, DamageType.Magic);
+                    if (target is DummyTarget dt) dt.Position = center;
+                    else if (target is MinionEntity me) me.Position = center;
+                    else if (target is HeroBase3D hb) hb.Position = center;
+
+                    float baseDmg = 180f + (UltimateRank - 1) * 90f;
+                    float damage = baseDmg + (EffectiveAttackDamage * 0.8f);
+                    target.TakeDamage(damage, DamageType.Magic, HeroId);
                 }
             }
 
@@ -152,7 +248,9 @@ namespace KOA.Core.Entities
             return true;
         }
 
-        public override void TakeDamage(float rawDamage, DamageType damageType)
+        public bool TryCastGravityCollapse(Vector3 groundPos, DummyTarget dummyTarget) => TryCastGravityCollapse(groundPos, (ITargetable)dummyTarget);
+
+        public override void TakeDamage(float rawDamage, DamageType damageType, string attackerId = null)
         {
             if (!IsAlive) return;
 
@@ -180,7 +278,7 @@ namespace KOA.Core.Entities
 
             if (remainingDamage > 0f)
             {
-                base.TakeDamage(remainingDamage, damageType);
+                base.TakeDamage(remainingDamage, damageType, attackerId);
             }
         }
 
@@ -193,7 +291,9 @@ namespace KOA.Core.Entities
             if (PassiveCooldownRemaining > 0f) PassiveCooldownRemaining -= deltaTime;
             if (Skill1CooldownRemaining > 0f) Skill1CooldownRemaining -= deltaTime;
             if (Skill2CooldownRemaining > 0f) Skill2CooldownRemaining -= deltaTime;
+            if (Skill3CooldownRemaining > 0f) Skill3CooldownRemaining -= deltaTime;
             if (UltimateCooldownRemaining > 0f) UltimateCooldownRemaining -= deltaTime;
+            if (AttackCooldownRemaining > 0f) AttackCooldownRemaining = UnityEngine.Mathf.Max(0f, AttackCooldownRemaining - deltaTime);
 
             if (IsMoving)
             {

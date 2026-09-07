@@ -204,44 +204,48 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 
 *หมายเหตุ: Effect ของสกิลทั้งหมดคงตามคำบรรยายเดิมใน Section 10 ของเอกสารต้นฉบับ ที่นี่เติมเฉพาะค่าตัวเลขที่ขาดหายไป*
 
-### 6.1 Vorkas
-| Ability | Cooldown | Mana Cost |
-|---|---|---|
-| Passive: Anti-Energy Aura | — (Passive) | — |
-| Iron Cleave | 8.0s | 60 |
-| Vanguard's Will | 14.0s | 80 |
-| Ultimate: Rebellion Impact | 90s (ลดเหลือ 70s ที่ Level 3 ของสกิล) | 100 |
+### 6.1 Vorkas (The Iron Vanguard — Melee Tank / Bruiser)
+| Ability / Key | Type | Cooldown | Mana Cost | รายละเอียดความสามารถ |
+|---|---|---|---|---|
+| Passive: Anti-Energy Aura | Passive | — | — | ลด Magic Damage ที่ได้รับ 15% และลด Spell Power ศัตรูรอบตัว |
+| **Q (Skill 1): Iron Cleave** | `SKILLSHOT_LINE` | 8.0s | 60 | ฟันคลื่นดาบเหล็กกล้าเป็นเส้นตรงระยะ 6.0m กว้าง 1.5m ทำกายภาพดาเมจ 75/125/175/225 (+80% AD) |
+| **W (Skill 2): Vanguard's Will** | `SELF_CAST` | 14.0s | 75 | ปลุกจิตวิญญาณแห่งแนวหน้า ได้รับบาเรียดูดซับ 100/160/220/280 HP นาน 4.0s และวิ่งเร็วขึ้น +20% |
+| **E (Skill 3): Seismic Slam** | `GROUND_TARGET_AOE` | 10.0s | 70 | กระทืบพื้นสร้างคลื่นสั่นสะเทือนรัศมี 3.5m ทำกายภาพดาเมจ 80/130/180/230 (+60% AD) และ Slow ศัตรู 40% นาน 2.5s |
+| **R (Ultimate): Rebellion Impact** | `GROUND_TARGET_AOE` | 90s/80s/70s | 100 | พุ่งกระโดดฟาดดาบลงพื้นในระยะ 7.0m ระเบิดทำดาเมจ 250/375/500 (+120% AD) พร้อม Knockup ศัตรูลอยขึ้น 1.0s |
 
-### 6.2 Zenthis
-| Ability | Cooldown | Mana Cost |
-|---|---|---|
-| Passive: Chrono Stasis | Internal CD 45s (ป้องกันการใช้ถี่เกินไป) | — |
-| Sacred Hourglass | 12.0s | 90 |
-| Aura of Eternity | 16.0s | 70 |
-| Ultimate: Grand Rewind | 120s | 150 |
+### 6.2 Zenthis (The Chrono Guardian — Ranged Time Mage / Controller)
+| Ability / Key | Type | Cooldown | Mana Cost | รายละเอียดความสามารถ |
+|---|---|---|---|---|
+| Passive: Chrono Stasis | Passive | Internal CD 45s | — | เมื่อ HP ต่ำกว่า 20% จะหยุดนิ่งไร้เป้าหมาย 1.5s ป้องกันดาเมจทั้งหมดและฟื้นฟู HP 15% |
+| **Q (Skill 1): Sacred Hourglass** | `GROUND_TARGET_AOE` | 12.0s | 90 | วางนาฬิกาทรายบิดเบือนเวลารัศมี 3.0m ในระยะ 8.0m ทำเวทดาเมจ 70/115/160/205 (+65% AD) และ Slow 35% |
+| **W (Skill 2): Aura of Eternity** | `SELF_CAST` | 16.0s | 70 | เปิดมิติเวลาคุ้มครอง เพิ่มความเร็วโจมตี +30% และรีเจนเลือด 25/40/55/70 HP/s นาน 4.0s |
+| **E (Skill 3): Temporal Rift** | `SKILLSHOT_LINE` | 9.0s | 65 | ยิงลำแสงกาลเวลาทะลวงเป็นเส้นตรงระยะ 8.0m ทำเวทดาเมจ 85/135/185/235 (+70% AD) และลด Attack Speed ศัตรูลง 40% นาน 3.0s |
+| **R (Ultimate): Grand Rewind** | `SELF_CAST` | 120s/105s/90s | 150 | ย้อนเวลาทั้งตำแหน่งและพลังชีวิตของ Zenthis กลับไปสู่สภาวะเมื่อ 4.0 วินาทีก่อน พร้อมล้าง Debuff ทั้งหมด |
 
-### 6.3 Korvax
-| Ability | Cooldown | Mana Cost |
-|---|---|---|
-| Passive: Momentum Piercer | — (Passive) | — |
-| Heavy Bolt | 10.0s | 60 |
-| Hunter's Focus | 18.0s | 50 |
-| Ultimate: Ballista Overdrive | 100s | 120 |
+### 6.3 Korvax (The Ballista Sniper — Ranged Physical Marksman)
+| Ability / Key | Type | Cooldown | Mana Cost | รายละเอียดความสามารถ |
+|---|---|---|---|---|
+| Passive: Momentum Piercer | Passive | — | — | ยิงเป้าหมายเดิมซ้อนกันจะสะสม Stack เจาะเกราะ (Armor Shred 3% ต่อ Stack, สูงสุด 5 Stacks) |
+| **Q (Skill 1): Heavy Bolt** | `SKILLSHOT_LINE` | 10.0s | 60 | ยิงลูกเกาทัณฑ์หนักระยะ 10.0m ทำดาเมจกายภาพ 90/145/200/255 (+90% AD) แก่เป้าหมายแรกที่ขวาง |
+| **W (Skill 2): Hunter's Focus** | `SELF_CAST` | 18.0s | 50 | รวบรวมสมาธินักล่า เพิ่มระยะโจมตี +2.5m และเพิ่มพลังโจมตี +20/30/40/50 AD นาน 5.0s |
+| **E (Skill 3): Concussive Blast** | `SINGLE_TARGET` | 11.0s | 65 | ยิงกระสุนระเบิดผลักเป้าหมายตรงหน้าระยะ 4.0m ให้กระเด็นถอยหลัง 3.5m ทำกายภาพดาเมจ 70/110/150/190 (+50% AD) และ Slow 40% นาน 2.0s |
+| **R (Ultimate): Ballista Overdrive** | `SKILLSHOT_LINE` | 100s/85s/70s | 120 | ชาร์จยิงสไนเปอร์ความเร็วสูงระยะ 18.0m ทำดาเมจกายภาพมหาศาล 300/450/600 (+140% AD) ทะลวงครีปและหยุดที่ฮีโร่ตัวแรก |
 
-### 6.4 Gravitor
-| Ability | Cooldown | Mana Cost |
-|---|---|---|
-| Passive: Antigravity Shield | Internal CD 12s | — |
-| Magnetic Pull | 12.0s | 70 |
-| Repulsion Zone | 14.0s | 80 |
-| Ultimate: Gravity Kore Collapse | 110s | 150 |
+### 6.4 Gravitor (The Gravity Singularity — Melee Tank / Disruptor)
+| Ability / Key | Type | Cooldown | Mana Cost | รายละเอียดความสามารถ |
+|---|---|---|---|---|
+| Passive: Antigravity Shield | Passive | Internal CD 12s | — | เมื่อได้รับความเสียหาย สร้างเกราะดูดซับ 80 (+8% Max HP) นาน 3.0s |
+| **Q (Skill 1): Magnetic Pull** | `SINGLE_TARGET` | 12.0s | 70 | ยิงสนามแม่เหล็กในระยะ 7.0m ดึงดูดเป้าหมายให้ลอยเข้ามาหา Gravitor ทำเวทดาเมจ 70/110/150/190 (+50% AD) |
+| **W (Skill 2): Repulsion Zone** | `SELF_CAST` | 14.0s | 80 | ปล่อยคลื่นแรงโน้มถ่วงผลักศัตรูรอบตัวรัศมี 4.0m ให้กระเด็นออกไป 3.0m ทำเวทดาเมจ 80/125/170/215 (+55% AD) |
+| **E (Skill 3): Graviton Well** | `GROUND_TARGET_AOE` | 10.0s | 75 | สร้างบ่อแรงโน้มถ่วงบนพื้นรัศมี 3.5m ในระยะ 6.0m ทำเวทดาเมจต่อเนื่อง 40/65/90/115 ทุก 0.5s และ Slow 50% นาน 2.5s |
+| **R (Ultimate): Gravity Kore Collapse** | `GROUND_TARGET_AOE` | 110s/95s/80s | 150 | วางหลุมดำขนาดยักษ์ในระยะ 7.5m ดูดศัตรูทุกคนในรัศมี 4.5m เข้าสู่ศูนย์กลาง ทำเวทดาเมจ 260/390/520 (+100% AD) พร้อม Stun 1.5s |
 
-### 6.5 Ability Target Type Taxonomy (ใหม่ — จัดหมวดให้เป็นระบบ)
+### 6.5 Ability Target Type Taxonomy (จัดหมวดให้เป็นระบบ)
 เพื่อให้ implement แบบ data-driven ได้ ทุกสกิลต้องจัดอยู่ใน 1 ใน 4 ประเภทนี้:
-1. **`SKILLSHOT_LINE`** — ยิงเป็นเส้นตรงตามทิศ aimVector (เช่น Iron Cleave, Heavy Bolt)
-2. **`GROUND_TARGET_AOE`** — เลือกพิกัดบนพื้น เกิด effect เป็นวงกลม (เช่น Sacred Hourglass, Rebellion Impact, Gravity Kore Collapse)
-3. **`SINGLE_TARGET`** — ล็อกเป้าหมายเดี่ยว (เช่น Magnetic Pull)
-4. **`SELF_CAST`** — ใช้กับตัวเองทันที ไม่ต้อง aim (เช่น Vanguard's Will, Hunter's Focus, Aura of Eternity ที่ผูกกับตัวเอง)
+1. **`SKILLSHOT_LINE`** — ยิงเป็นเส้นตรงตามทิศ aimVector (เช่น Iron Cleave, Heavy Bolt, Ballista Overdrive, Temporal Rift)
+2. **`GROUND_TARGET_AOE`** — เลือกพิกัดบนพื้น เกิด effect เป็นวงกลม (เช่น Sacred Hourglass, Seismic Slam, Graviton Well, Rebellion Impact, Gravity Kore Collapse)
+3. **`SINGLE_TARGET`** — ล็อกเป้าหมายเดี่ยว (เช่น Magnetic Pull, Concussive Blast)
+4. **`SELF_CAST`** — ใช้กับตัวเองทันที ไม่ต้อง aim (เช่น Vanguard's Will, Hunter's Focus, Aura of Eternity, Repulsion Zone, Grand Rewind)
 
 ---
 
@@ -259,7 +263,17 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 ### 7.2 PC Control Scheme (Scope จริงของ 1.0.0)
 - **เคลื่อนที่:** Right-click (Click-to-move) แบบ DOTA มาตรฐาน
 - **โจมตี:** Left-click ที่ศัตรู หรือกด A แล้ว click (Attack-move)
-- **สกิล:** Q / W / E สำหรับ Skill 1/2/Ultimate, aim ด้วยตำแหน่งเมาส์บนโลก (world-space)
+- **สกิล (4 สกิลเต็มรูปแบบ สไตล์ MOBA/Dota 2):**
+  - **Q:** Skill 1
+  - **W:** Skill 2
+  - **E:** Skill 3
+  - **R:** Ultimate
+  - **Ctrl + Q / W / E / R:** อัปเกรดระดับสกิลด่วน (Quick Skill Level-Up)
+  - **Ctrl + U:** อัปเกรด Attribute Bonus (+Stats)
+  - Aim ด้วยตำแหน่งเมาส์บนโลก (world-space mouse cursor)
+  - **1–6:** ใช้งาน Active Items ในช่อง Inventory (6 ช่อง)
+  - **P:** สลับเปิด/ปิดร้านค้า (เมื่ออยู่ใน Fountain Zone ตาม Section 5.1)
+  - **T:** เปิดหน้าต่าง Talent Tree (เลเวล 4, 8, 12)
 
 ### 7.3 Mobile Control Scheme (เลื่อนไป Version 1.1.0 — เก็บ Spec ไว้ล่วงหน้า)
 - **เคลื่อนที่:** Virtual Joystick มุมซ้ายล่าง

@@ -6,6 +6,7 @@ namespace KOA.Presentation.UI
     /// <summary>
     /// World-space Health Bar เหนือหัวตัวละครตาม Section 8
     /// หันหน้าเข้าหากล้องเสมอ (Billboard effect) และปรับขนาดตามค่า HP
+    /// ทำลายตัวเองอัตโนมัติเมื่อเป้าหมาย (Unit) ถูกทำลาย เพื่อไม่ให้มีแถบค้างบนแผนที่
     /// </summary>
     public class WorldSpaceHealthBar : MonoBehaviour
     {
@@ -19,6 +20,8 @@ namespace KOA.Presentation.UI
 
         private Transform _targetTransform;
         private UnityEngine.Camera _mainCamera;
+        private float _initialScaleX = 1.36f;
+        private Vector3 _initialLocalPos = new Vector3(0, 0, -0.01f);
 
         private void Awake()
         {
@@ -30,16 +33,35 @@ namespace KOA.Presentation.UI
             _targetTransform = target;
         }
 
+        public void SetupScaleBar(Transform fillBarTransform)
+        {
+            fillScaleBar = fillBarTransform;
+            if (fillScaleBar != null)
+            {
+                _initialScaleX = fillScaleBar.localScale.x > 0.01f ? fillScaleBar.localScale.x : 1.36f;
+                _initialLocalPos = fillScaleBar.localPosition;
+            }
+        }
+
         private void LateUpdate()
         {
-            if (_targetTransform != null)
+            // หากเป้าหมายตายหรือถูกทำลาย (Destroyed) ให้ทำลายหลอดเลือดตามไปด้วย ไม่ให้ค้างในฉาก
+            if (_targetTransform == null)
             {
-                transform.position = _targetTransform.position + offset;
+                Destroy(gameObject);
+                return;
+            }
+
+            transform.position = _targetTransform.position + offset;
+
+            if (_mainCamera == null)
+            {
+                _mainCamera = UnityEngine.Camera.main;
             }
 
             if (_mainCamera != null)
             {
-                // Billboard หันหน้าเข้าหากล้อง
+                // Billboard หันหน้าเข้าหากล้องเสมอ
                 transform.rotation = _mainCamera.transform.rotation;
             }
         }
@@ -55,9 +77,21 @@ namespace KOA.Presentation.UI
 
             if (fillScaleBar != null)
             {
-                Vector3 scale = fillScaleBar.localScale;
-                scale.x = fillRatio;
-                fillScaleBar.localScale = scale;
+                if (fillRatio <= 0.001f)
+                {
+                    fillScaleBar.gameObject.SetActive(false);
+                }
+                else
+                {
+                    fillScaleBar.gameObject.SetActive(true);
+                    Vector3 scale = fillScaleBar.localScale;
+                    scale.x = _initialScaleX * fillRatio;
+                    fillScaleBar.localScale = scale;
+
+                    // เลื่อน localPosition ให้แถบเลือดหดจากขวาไปซ้ายอย่างเป็นธรรมชาติ
+                    float offsetLeft = -(_initialScaleX * (1f - fillRatio) * 0.5f);
+                    fillScaleBar.localPosition = new Vector3(_initialLocalPos.x + offsetLeft, _initialLocalPos.y, _initialLocalPos.z);
+                }
             }
         }
 

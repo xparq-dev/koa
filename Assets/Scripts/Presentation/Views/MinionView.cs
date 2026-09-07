@@ -59,6 +59,10 @@ namespace KOA.Presentation.Views
                 Logic.OnHealthChanged -= HandleHealthChanged;
                 Logic.OnKilled -= HandleKilled;
             }
+            if (healthBar != null)
+            {
+                Destroy(healthBar.gameObject);
+            }
         }
 
         private void Update()
@@ -80,6 +84,10 @@ namespace KOA.Presentation.Views
 
         private void HandleKilled(MinionEntity minion, string killerId)
         {
+            if (healthBar != null)
+            {
+                Destroy(healthBar.gameObject);
+            }
             Destroy(gameObject);
         }
     }

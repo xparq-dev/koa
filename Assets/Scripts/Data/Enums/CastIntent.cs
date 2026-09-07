@@ -9,6 +9,7 @@ namespace KOA.Data.Enums
         CastAttack = 1,
         CastSkill1 = 2,
         CastSkill2 = 3,
-        CastUltimate = 4
+        CastSkill3 = 4,
+        CastUltimate = 5
     }
 }

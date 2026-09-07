@@ -33,6 +33,11 @@ namespace KOA.Presentation.Views
                 laserLineRenderer = GetComponentInChildren<LineRenderer>();
             }
 
+            if (towerMeshRenderer == null)
+            {
+                towerMeshRenderer = GetComponent<Renderer>();
+            }
+
             if (healthBar != null)
             {
                 healthBar.BindTarget(transform);
@@ -44,6 +49,16 @@ namespace KOA.Presentation.Views
             Logic.OnDestroyed += HandleDestroyed;
         }
 
+        public void SetHealthBar(WorldSpaceHealthBar bar)
+        {
+            healthBar = bar;
+            if (healthBar != null && Logic != null)
+            {
+                healthBar.BindTarget(transform);
+                healthBar.SetHealth(Logic.CurrentHp, Logic.Stats.MaxHp);
+            }
+        }
+
         private void OnDestroy()
         {
             if (Logic != null)
@@ -51,6 +66,10 @@ namespace KOA.Presentation.Views
                 Logic.OnHealthChanged -= HandleHealthChanged;
                 Logic.OnAttackFired -= HandleAttackFired;
                 Logic.OnDestroyed -= HandleDestroyed;
+            }
+            if (healthBar != null)
+            {
+                Destroy(healthBar.gameObject);
             }
         }
 
@@ -92,13 +111,45 @@ namespace KOA.Presentation.Views
 
         private void HandleDestroyed()
         {
-            if (towerMeshRenderer != null)
+            if (healthBar != null)
             {
-                towerMeshRenderer.material.color = new Color(0.2f, 0.2f, 0.2f, 0.5f);
+                Destroy(healthBar.gameObject);
             }
+
             if (laserLineRenderer != null)
             {
                 laserLineRenderer.enabled = false;
+            }
+
+            // 1. ปิด Collider ทันที เพื่อไม่ให้ตัวละครหรือครีบเดินชน และไม่สามารถคลิกเป็นเป้าหมายได้อีก
+            var colliders = GetComponentsInChildren<Collider>();
+            foreach (var col in colliders)
+            {
+                col.enabled = false;
+            }
+
+            // 2. ปรับ Visual ให้กลายเป็นฐานซากปรักหักพัง (Destroyed Tower Ruins) สไตล์เกม MOBA
+            if (towerMeshRenderer == null)
+            {
+                towerMeshRenderer = GetComponent<Renderer>();
+            }
+
+            if (towerMeshRenderer != null)
+            {
+                towerMeshRenderer.material.color = new Color(0.18f, 0.18f, 0.18f, 0.9f); // สีหินไหม้เกรียม
+            }
+
+            // ยุบความสูงของป้อมลงเหลือเพียงแท่นหินเตี้ยๆ ติดพื้น (ความสูง 0.22 เมตร)
+            Vector3 ruinedScale = transform.localScale;
+            ruinedScale.y = 0.22f;
+            ruinedScale.x *= 1.05f;
+            ruinedScale.z *= 1.05f;
+            transform.localScale = ruinedScale;
+
+            // วางแท่นหินแนบพื้นพอดี
+            if (Logic != null)
+            {
+                transform.position = new Vector3(Logic.Position.x, 0.11f, Logic.Position.z);
             }
         }
     }

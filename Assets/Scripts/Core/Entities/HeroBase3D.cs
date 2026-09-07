@@ -33,13 +33,17 @@ namespace KOA.Core.Entities
     /// Abstract Base Class สำหรับ Hero 3D Logic (Section 2.1)
     /// ทำงานใน Simulation Core โดยแยกออกจาก Presentation Layer (Decoupled Core Paradigm)
     /// </summary>
-    public abstract class HeroBase3D
+    public abstract class HeroBase3D : ITargetable
     {
         public const int MaxLevel = 12; // Level Cap สำหรับ 1.0.0 (Section 2.2)
 
-        // ข้อมูลระบุตัวตน
+        // ข้อมูลระบุตัวตนและ ITargetable
         public string HeroId { get; protected set; }
+        public string TargetId => HeroId;
         public string DisplayName { get; protected set; }
+        public int TeamId { get; set; } = 0; // 0 = Blue (Player), 1 = Red (Bot)
+        public float Radius { get; set; } = 0.8f;
+        public float MaxHp => EffectiveMaxHp;
 
         // เลเวลและค่าประสบการณ์ (Section 2.2)
         public int CurrentLevel { get; protected set; } = 1;
@@ -64,23 +68,50 @@ namespace KOA.Core.Entities
         public Vector3 Position { get; set; }
         public Quaternion Rotation { get; set; } = Quaternion.identity;
         public bool IsAlive => CurrentHp > 0f;
+        public bool IsMoving { get; protected set; }
+        public ITargetable CurrentAttackTarget { get; set; }
 
         // ระบบช่องเก็บของ 6 ช่อง (Section 5.1)
         public KOA.Core.Items.Inventory Inventory { get; } = new KOA.Core.Items.Inventory();
 
-        // สถิติสุทธิหลังรวมการเติบโตต่อเลเวล และไอเทมในกระเป๋า (Section 2.2 & Section 5.2)
-        public float EffectiveMaxHp => BaseMaxHp + (StatGrowth.HpPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxHp;
-        public float EffectiveMaxMana => BaseMaxMana + (StatGrowth.ManaPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxMana;
-        public float EffectiveArmor => BaseArmor + (StatGrowth.ArmorPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusArmor;
+        // ระบบแต้มสกิลและระดับสกิลสไตล์ DOTA 2
+        public int AvailableSkillPoints { get; protected set; } = 1;
+        public int Skill1Rank { get; protected set; } = 0; // Max 4 (Q)
+        public int Skill2Rank { get; protected set; } = 0; // Max 4 (W)
+        public int Skill3Rank { get; protected set; } = 0; // Max 4 (E)
+        public int UltimateRank { get; protected set; } = 0; // Max 3 (R - Unlocks at Lv 6, 10, 12)
+        public int StatBonusRank { get; protected set; } = 0; // Max 4 (+All Attributes)
+
+        // Talent Tree (Lv 4, 8, 12) (-1 = Unchosen, 0 = Option A, 1 = Option B)
+        public int TalentTier1Choice { get; protected set; } = -1; // Lv 4: 0 = +15% AtkSpeed, 1 = +150 Max HP
+        public int TalentTier2Choice { get; protected set; } = -1; // Lv 8: 0 = 15% CDR, 1 = +25 Base AD
+        public int TalentTier3Choice { get; protected set; } = -1; // Lv 12: 0 = +20% Lifesteal/Regen, 1 = +30 Armor
+
+        // สถิติสุทธิหลังรวมการเติบโตต่อเลเวล, ไอเทม, Stat Bonus (+Stats), และ Talents
+        public float EffectiveMaxHp => BaseMaxHp + (StatGrowth.HpPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxHp + (StatBonusRank * 60f) + (TalentTier1Choice == 1 ? 150f : 0f);
+        public float EffectiveMaxMana => BaseMaxMana + (StatGrowth.ManaPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxMana + (StatBonusRank * 40f);
+        public float EffectiveArmor => BaseArmor + (StatGrowth.ArmorPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusArmor + (StatBonusRank * 1.5f) + (TalentTier3Choice == 1 ? 30f : 0f);
         public float EffectiveMagicResist => BaseMagicResist + (StatGrowth.MrPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMagicResist;
-        public float EffectiveAttackDamage => BaseAttackDamage + (StatGrowth.AdPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusAttackDamage;
-        public float EffectiveMoveSpeed => BaseMoveSpeed + Inventory.TotalBonusMoveSpeed;
+        public float EffectiveAttackDamage => BaseAttackDamage + (StatGrowth.AdPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusAttackDamage + (StatBonusRank * 3.0f) + (TalentTier2Choice == 1 ? 25f : 0f);
+        public virtual float EffectiveMoveSpeed => BaseMoveSpeed + Inventory.TotalBonusMoveSpeed;
+        public float EffectiveCooldownReduction => (TalentTier2Choice == 0 ? 0.15f : 0f) + Inventory.TotalBonusCooldownReduction;
+        /// <summary>คูลดาวน์โจมตีปกติหลังคิดรวม Attack Rate Bonus จากไอเทม (TalentTier1 +15% ด้วย) (Section 5.2)</summary>
+        public float EffectiveAttackCooldownFromBase(float baseAttackCooldown)
+        {
+            float rateBonus = Inventory.TotalBonusAttackRatePercent + (TalentTier1Choice == 0 ? 0.15f : 0f);
+            return baseAttackCooldown / (1f + rateBonus);
+        }
+
+        // ค่าสถานะ Fountain Zone
+        public bool IsInFountainZone { get; set; } = false;
 
         // Events สำหรับ Presentation Layer เพื่ออัปเดต UI/Billboard โดยไม่ผูกติดกัน (Decoupled Core)
         public event Action<float, float> OnHealthChanged;
         public event Action<float, float> OnManaChanged;
         public event Action<float, float> OnExpChanged;
         public event Action<int> OnLevelUp;
+        public event Action<int> OnSkillPointsChanged;
+        public event Action OnSkillProgressionChanged;
         public event Action OnDied;
         public event Action OnRespawned;
 
@@ -108,10 +139,119 @@ namespace KOA.Core.Entities
             InvokeHealthChanged();
         }
 
+        /// <summary>
+        /// เรียกทุก Tick ขณะอยู่ใน Fountain Zone: ฟื้น HP/Mana 20% MaxHP-MaxMana ต่อวินาที (Section 3.1)
+        /// </summary>
+        public void FountainZoneTick(float deltaTime)
+        {
+            if (!IsAlive) return;
+            float hpRegen = EffectiveMaxHp * 0.20f * deltaTime;
+            float manaRegen = EffectiveMaxMana * 0.20f * deltaTime;
+            CurrentHp = Mathf.Min(EffectiveMaxHp, CurrentHp + hpRegen);
+            CurrentMana = Mathf.Min(EffectiveMaxMana, CurrentMana + manaRegen);
+            InvokeHealthChanged();
+            InvokeManaChanged();
+        }
+
         public void SetHealthExplicit(float newHp)
         {
             CurrentHp = Mathf.Clamp(newHp, 0f, EffectiveMaxHp);
             InvokeHealthChanged();
+        }
+
+        // ==========================================
+        // DOTA 2 SKILL PROGRESSION & TALENT METHODS
+        // ==========================================
+
+        public bool CanLevelSkill1() => AvailableSkillPoints > 0 && Skill1Rank < 4;
+        public bool CanLevelSkill2() => AvailableSkillPoints > 0 && Skill2Rank < 4;
+        public bool CanLevelSkill3() => AvailableSkillPoints > 0 && Skill3Rank < 4;
+        public bool CanLevelUltimate() => AvailableSkillPoints > 0 && UltimateRank < 3 && ((UltimateRank == 0 && CurrentLevel >= 6) || (UltimateRank == 1 && CurrentLevel >= 10) || (UltimateRank == 2 && CurrentLevel >= 12));
+        public bool CanLevelStatBonus() => AvailableSkillPoints > 0 && StatBonusRank < 4;
+
+        public bool TryLevelSkill1()
+        {
+            if (AvailableSkillPoints <= 0 || Skill1Rank >= 4) return false;
+            Skill1Rank++;
+            AvailableSkillPoints--;
+            OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnSkillProgressionChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryLevelSkill2()
+        {
+            if (AvailableSkillPoints <= 0 || Skill2Rank >= 4) return false;
+            Skill2Rank++;
+            AvailableSkillPoints--;
+            OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnSkillProgressionChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryLevelSkill3()
+        {
+            if (AvailableSkillPoints <= 0 || Skill3Rank >= 4) return false;
+            Skill3Rank++;
+            AvailableSkillPoints--;
+            OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnSkillProgressionChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryLevelUltimate()
+        {
+            if (AvailableSkillPoints <= 0 || UltimateRank >= 3) return false;
+            // DOTA Style: Ultimate unlocks at Level 6, 10, 12
+            if (UltimateRank == 0 && CurrentLevel < 6) return false;
+            if (UltimateRank == 1 && CurrentLevel < 10) return false;
+            if (UltimateRank == 2 && CurrentLevel < 12) return false;
+
+            UltimateRank++;
+            AvailableSkillPoints--;
+            OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnSkillProgressionChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryLevelStatBonus()
+        {
+            if (AvailableSkillPoints <= 0 || StatBonusRank >= 4) return false;
+            StatBonusRank++;
+            AvailableSkillPoints--;
+            CurrentHp += 60f;
+            CurrentMana += 40f;
+            InvokeHealthChanged();
+            InvokeManaChanged();
+            OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnSkillProgressionChanged?.Invoke();
+            return true;
+        }
+
+        public bool TrySelectTalent(int tier, int optionIndex)
+        {
+            if (optionIndex < 0 || optionIndex > 1) return false;
+            if (tier == 1 && CurrentLevel >= 4 && TalentTier1Choice == -1)
+            {
+                TalentTier1Choice = optionIndex;
+                if (optionIndex == 1) CurrentHp += 150f;
+                InvokeHealthChanged();
+                OnSkillProgressionChanged?.Invoke();
+                return true;
+            }
+            if (tier == 2 && CurrentLevel >= 8 && TalentTier2Choice == -1)
+            {
+                TalentTier2Choice = optionIndex;
+                OnSkillProgressionChanged?.Invoke();
+                return true;
+            }
+            if (tier == 3 && CurrentLevel >= 12 && TalentTier3Choice == -1)
+            {
+                TalentTier3Choice = optionIndex;
+                OnSkillProgressionChanged?.Invoke();
+                return true;
+            }
+            return false;
         }
 
         protected HeroBase3D(string heroId, string displayName, float baseHp, float baseMana, float baseArmor, float baseMr, float baseAd, float baseSpeed, float attackRange, HeroStatGrowth statGrowth)
@@ -175,19 +315,25 @@ namespace KOA.Core.Entities
         protected virtual void LevelUp()
         {
             CurrentLevel++;
+            AvailableSkillPoints++;
+
             // ฮีล HP/Mana ส่วนที่เพิ่มขึ้นมา
             CurrentHp += StatGrowth.HpPerLevel;
             CurrentMana += StatGrowth.ManaPerLevel;
 
             OnLevelUp?.Invoke(CurrentLevel);
+            OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnSkillProgressionChanged?.Invoke();
             OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
             OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
         }
 
+        public event Action<float, DamageType> OnDamageTaken;
+
         /// <summary>
         /// คำนวณความเสียหายที่ได้รับตามเกราะและค่าต้านทานเวท (Section 6)
         /// </summary>
-        public virtual void TakeDamage(float rawDamage, DamageType damageType)
+        public virtual void TakeDamage(float rawDamage, DamageType damageType, string attackerId = null)
         {
             if (!IsAlive) return;
 
@@ -206,6 +352,7 @@ namespace KOA.Core.Entities
             }
 
             CurrentHp = Mathf.Max(0f, CurrentHp - netDamage);
+            OnDamageTaken?.Invoke(netDamage, damageType);
             OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
 
             if (CurrentHp <= 0f)
@@ -243,5 +390,35 @@ namespace KOA.Core.Entities
         /// Tick ฟังก์ชันสำหรับ Simulation Core (รันที่ 30 Ticks/sec ตาม Section 1.1)
         /// </summary>
         public abstract void SimulationTick(float deltaTime);
+
+        /// <summary>
+        /// ตรรกะโจมตีพื้นฐาน (Basic Attack) รองรับทุกเป้าหมายที่เป็น ITargetable
+        /// </summary>
+        public abstract bool TryBasicAttack(ITargetable target);
+
+        /// <summary>
+        /// ตรวจสอบการชนของเส้นทาง Skillshot Line กับเป้าหมายทรงกลม (Section 6.5)
+        /// </summary>
+        public static bool CheckSkillshotLineHit(Vector3 lineStart, Vector3 lineEnd, float lineWidth, Vector3 targetPos, float targetRadius)
+        {
+            Vector3 lineDir = lineEnd - lineStart;
+            float lineLength = lineDir.magnitude;
+            if (lineLength <= 0.001f) return false;
+
+            Vector3 lineNorm = lineDir / lineLength;
+            Vector3 toTarget = targetPos - lineStart;
+            float projection = Vector3.Dot(toTarget, lineNorm);
+
+            if (projection < 0f || projection > lineLength)
+            {
+                float distStart = Vector3.Distance(lineStart, targetPos);
+                float distEnd = Vector3.Distance(lineEnd, targetPos);
+                return Mathf.Min(distStart, distEnd) <= (lineWidth * 0.5f + targetRadius);
+            }
+
+            Vector3 closestPoint = lineStart + (lineNorm * projection);
+            float distanceToLine = Vector3.Distance(closestPoint, targetPos);
+            return distanceToLine <= ((lineWidth * 0.5f) + targetRadius);
+        }
     }
 }

@@ -7,6 +7,7 @@ using KOA.Presentation.Camera;
 using KOA.Presentation.Input;
 using KOA.Presentation.UI;
 using KOA.Presentation.Views;
+using KOA.Data.Enums;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -23,15 +24,25 @@ namespace KOA.Presentation.Testing
         [SerializeField] private bool autoBuildOnStart = true;
         [SerializeField] private BotDifficulty initialBotDifficulty = BotDifficulty.Medium;
 
+        public static VerticalSliceBootstrap Instance { get; private set; }
+
         public MatchSimulation MatchSimulation { get; private set; }
         public ModularBotBrain BotBrain { get; private set; }
         public HeroBase3D CurrentPlayerHero { get; private set; }
-        public VorkasHero BotHero { get; private set; }
+        public HeroBase3D BotHero { get; private set; }
 
         private GameObject _playerHeroGo;
         private HeroView _playerHeroView;
         private MatchHUD _matchHud;
         private bool _isBuilt = false;
+
+        // Respawn System
+        private float _playerRespawnTimer = -1f;
+        private float _botRespawnTimer = -1f;
+        private Vector3 _blueFountain = new Vector3(0, 0, -33f);
+        private Vector3 _redFountain = new Vector3(0, 0, 33f);
+        private GameObject _botGo;
+        private GameObject _botGoRef;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoInitializeOnPlay()
@@ -65,6 +76,7 @@ namespace KOA.Presentation.Testing
 
         private void Awake()
         {
+            Instance = this;
             if (autoBuildOnStart && !_isBuilt)
             {
                 BuildFullArena();
@@ -121,6 +133,44 @@ namespace KOA.Presentation.Testing
             {
                 BotBrain.SimulationTick(Time.deltaTime);
             }
+
+            // Player Respawn Countdown
+            if (_playerRespawnTimer > 0f)
+            {
+                _playerRespawnTimer -= Time.deltaTime;
+                if (_matchHud != null)
+                    _matchHud.RespawnTimeRemaining = _playerRespawnTimer;
+
+                if (_playerRespawnTimer <= 0f)
+                {
+                    _playerRespawnTimer = -1f;
+                    if (CurrentPlayerHero != null)
+                    {
+                        CurrentPlayerHero.Respawn(_blueFountain + Vector3.up);
+                        if (_matchHud != null)
+                        {
+                            _matchHud.IsPlayerDead = false;
+                            _matchHud.RespawnTimeRemaining = 0f;
+                        }
+                    }
+                }
+            }
+
+            // Bot Respawn Countdown
+            if (_botRespawnTimer > 0f)
+            {
+                _botRespawnTimer -= Time.deltaTime;
+                if (_botRespawnTimer <= 0f)
+                {
+                    _botRespawnTimer = -1f;
+                    if (BotHero != null)
+                    {
+                        BotHero.Respawn(_redFountain + Vector3.up);
+                        if (_botGoRef != null)
+                            _botGoRef.transform.position = _redFountain + Vector3.up;
+                    }
+                }
+            }
         }
 
         public void BuildFullArena()
@@ -174,22 +224,16 @@ namespace KOA.Presentation.Testing
             SpawnPlayerHero("Vorkas");
 
             // 7. สร้าง Bot Hero (Red Team) ควบคุมโดย ModularBotBrain (Section 9)
-            GameObject botGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            botGo.name = "Bot_Vorkas";
-            botGo.transform.position = new Vector3(0, 1.0f, 8.0f);
-            botGo.GetComponent<Renderer>().material.color = new Color(0.9f, 0.2f, 0.2f);
+            SpawnBotHero("Vorkas");
 
-            BotHero = new VorkasHero(botGo.transform.position);
-            CreateHealthBar(botGo.transform, "BotHealthBar", Color.red);
-
-            BotBrain = new ModularBotBrain(BotHero, redFountain, blueFountain, initialBotDifficulty);
-            BotBrain.TargetEnemyHero = CurrentPlayerHero;
 
             // 8. สร้าง MatchHUD
             GameObject hudGo = new GameObject("MatchHUD");
             _matchHud = hudGo.AddComponent<MatchHUD>();
             _matchHud.BindMatch(MatchSimulation, CurrentPlayerHero, MatchSimulation.BlueWallet, BotBrain);
+            _matchHud.OnPlayAgainRequested += HandlePlayAgain;
             _matchHud.OnHeroSwitched += SwitchHero;
+            _matchHud.OnBotHeroSwitched += SwitchBotHero;
 
             // 9. กล้อง Top-Down Isometric 50 องศา (Section 7.1)
             UnityEngine.Camera mainCam = UnityEngine.Camera.main;
@@ -233,6 +277,9 @@ namespace KOA.Presentation.Testing
             MinionView view = minionGo.AddComponent<MinionView>();
             view.BindLogic(minion);
             view.SetHealthBar(hb);
+
+            minion.OnAttackExecuted += (targetPos) => DamagePopupManager.Instance?.ShowDamage(targetPos, minion.AttackDamage, DamageType.Physical);
+            minion.OnDamageTaken += (dmg, type) => DamagePopupManager.Instance?.ShowDamage(minionGo.transform.position, dmg, type);
         }
 
         private void SpawnPlayerHero(string heroName)
@@ -262,12 +309,32 @@ namespace KOA.Presentation.Testing
                 "Gravitor" => new GravitorHero(_playerHeroGo.transform.position),
                 _ => new VorkasHero(_playerHeroGo.transform.position)
             };
+            CurrentPlayerHero.TeamId = 0;
+            if (MatchSimulation != null) MatchSimulation.BlueHero = CurrentPlayerHero;
 
-            CreateHealthBar(_playerHeroGo.transform, "PlayerHealthBar", Color.green);
+            CurrentPlayerHero.OnDamageTaken += (dmg, type) => DamagePopupManager.Instance?.ShowDamage(_playerHeroGo.transform.position, dmg, type);
+            CurrentPlayerHero.OnDied += () =>
+            {
+                if (CurrentPlayerHero != null)
+                {
+                    float respawnTime = CurrentPlayerHero.CalculateRespawnTime();
+                    _playerRespawnTimer = respawnTime;
+                    // Section 4.1: Kill Gold = 200g base + Streak Bonus ให้ Red Wallet
+                    MatchSimulation?.RedWallet?.RecordHeroKill();
+                    // Section 4.2: EXP ให้แก่ Bot Hero
+                    BotHero?.AddExp(350f);
+                    // Reset Player streak เมื่อตาย
+                    MatchSimulation?.BlueWallet?.RecordDeath();
+                    Debug.Log($"[Bootstrap] Player died. Respawning in {respawnTime:F1}s");
+                }
+            };
+
+            WorldSpaceHealthBar playerHb = CreateHealthBar(_playerHeroGo.transform, "PlayerHealthBar", Color.green);
 
             _playerHeroGo.AddComponent<PCInputAdapter>();
             _playerHeroView = _playerHeroGo.AddComponent<HeroView>();
             _playerHeroView.BindHero(CurrentPlayerHero);
+            _playerHeroView.SetHealthBar(playerHb);
 
             // อัปเดตกล้องให้จับตามฮีโร่ใหม่
             var cam = UnityEngine.Camera.main?.GetComponent<TopDownCameraController>();
@@ -289,6 +356,90 @@ namespace KOA.Presentation.Testing
             SpawnPlayerHero(heroName);
         }
 
+        private void SpawnBotHero(string heroName)
+        {
+            if (_botGoRef != null)
+            {
+                Destroy(_botGoRef);
+            }
+
+            _botGoRef = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            _botGoRef.name = $"Bot_{heroName}";
+            _botGoRef.transform.position = new Vector3(0, 1.0f, 8.0f);
+
+            Color botColor = heroName switch
+            {
+                "Zenthis" => new Color(0.9f, 0.7f, 0.2f),
+                "Korvax" => new Color(0.2f, 0.8f, 0.6f),
+                "Gravitor" => new Color(0.7f, 0.2f, 0.9f),
+                _ => new Color(0.9f, 0.2f, 0.2f) // Vorkas
+            };
+            _botGoRef.GetComponent<Renderer>().material.color = botColor;
+
+            BotHero = heroName switch
+            {
+                "Zenthis" => new ZenthisHero(_botGoRef.transform.position),
+                "Korvax" => new KorvaxHero(_botGoRef.transform.position),
+                "Gravitor" => new GravitorHero(_botGoRef.transform.position),
+                _ => new VorkasHero(_botGoRef.transform.position)
+            };
+            BotHero.TeamId = 1;
+
+            WorldSpaceHealthBar botHb = CreateHealthBar(_botGoRef.transform, "BotHealthBar", Color.red);
+
+            HeroView botHeroView = _botGoRef.AddComponent<HeroView>();
+            botHeroView.BindHero(BotHero);
+            botHeroView.SetHealthBar(botHb);
+
+            BotHero.OnDamageTaken += (dmg, type) => DamagePopupManager.Instance?.ShowDamage(_botGoRef.transform.position, dmg, type);
+            BotHero.OnDied += () =>
+            {
+                if (BotHero != null)
+                {
+                    float respawnTime = BotHero.CalculateRespawnTime();
+                    _botRespawnTimer = respawnTime;
+                    // Section 4.1: Kill Gold = 200g base + Streak Bonus (RecordHeroKill handles this)
+                    MatchSimulation?.BlueWallet?.RecordHeroKill();
+                    // Section 4.2: EXP เทียบเท่าครีป ~10 ตัว (~350 EXP)
+                    CurrentPlayerHero?.AddExp(350f);
+                    // รีเซ็ต Bot streak เมื่อตาย
+                    MatchSimulation?.RedWallet?.RecordDeath();
+                    Debug.Log($"[Bootstrap] Bot died. Respawning in {respawnTime:F1}s");
+                }
+            };
+
+            if (MatchSimulation != null)
+            {
+                MatchSimulation.RedHero = BotHero;
+            }
+
+            BotDifficulty currentDiff = BotBrain != null ? BotBrain.Difficulty : initialBotDifficulty;
+            BotBrain = new ModularBotBrain(BotHero, _redFountain, _blueFountain, MatchSimulation, currentDiff);
+            BotBrain.TargetEnemyHero = CurrentPlayerHero;
+
+            if (_matchHud != null)
+            {
+                _matchHud.BotBrain = BotBrain;
+            }
+        }
+
+        private void SwitchBotHero(string heroName)
+        {
+            Debug.Log($"[Bootstrap] Switching Bot Hero to: {heroName}");
+            SpawnBotHero(heroName);
+        }
+
+        private void HandlePlayAgain()
+        {
+            Debug.Log("[Bootstrap] Play Again requested — reloading scene.");
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            UnityEngine.SceneManagement.SceneManager.LoadScene(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+#endif
+        }
+
         private void SpawnTowerView(TowerEntity tower, string name, Color color)
         {
             GameObject towerGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -303,10 +454,14 @@ namespace KOA.Presentation.Testing
             lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
             lineRenderer.enabled = false;
 
-            CreateHealthBar(towerGo.transform, $"{name}_HealthBar", color);
+            WorldSpaceHealthBar towerHb = CreateHealthBar(towerGo.transform, $"{name}_HealthBar", color);
 
             TowerView view = towerGo.AddComponent<TowerView>();
             view.BindLogic(tower);
+            view.SetHealthBar(towerHb);
+
+            tower.OnAttackFired += (targetPos, dmg, isHeated) => DamagePopupManager.Instance?.ShowDamage(targetPos, dmg, DamageType.Physical);
+            tower.OnDamageTaken += (dmg, type) => DamagePopupManager.Instance?.ShowDamage(towerGo.transform.position, dmg, type);
         }
 
         private WorldSpaceHealthBar CreateHealthBar(Transform parentTarget, string barName, Color color)
@@ -332,6 +487,8 @@ namespace KOA.Presentation.Testing
             Destroy(fillQuad.GetComponent<Collider>());
             fillQuad.GetComponent<Renderer>().material = new Material(Shader.Find("Sprites/Default"));
             fillQuad.GetComponent<Renderer>().material.color = color;
+
+            wsHealthBar.SetupScaleBar(fillQuad.transform);
 
             return wsHealthBar;
         }

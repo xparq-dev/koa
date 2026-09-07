@@ -8,7 +8,7 @@ namespace KOA.Core.Entities
     /// หุ่นฝึกซ้อม (Dummy Target) สำหรับทดสอบระบบการทำดาเมจใน Phase 1
     /// รันบน Simulation Core โดยแยกออกจาก Presentation Layer (Decoupled Core)
     /// </summary>
-    public class DummyTarget
+    public class DummyTarget : ITargetable
     {
         public string TargetId { get; private set; }
         public float MaxHp { get; private set; } = 1000f;
@@ -18,6 +18,7 @@ namespace KOA.Core.Entities
         public float Radius { get; private set; } = 0.8f;
         public Vector3 Position { get; set; }
         public bool IsAlive => CurrentHp > 0f;
+        public int TeamId => -1; // Neutral
 
         private float _respawnTimer = 0f;
         private const float RespawnDelay = 3.0f;
@@ -37,7 +38,7 @@ namespace KOA.Core.Entities
             CurrentHp = MaxHp;
         }
 
-        public void TakeDamage(float rawDamage, DamageType damageType)
+        public void TakeDamage(float rawDamage, DamageType damageType, string attackerId = null)
         {
             if (!IsAlive) return;
 
@@ -63,6 +64,8 @@ namespace KOA.Core.Entities
                 OnDied?.Invoke();
             }
         }
+
+        public void TakeDamage(float rawDamage, DamageType damageType) => TakeDamage(rawDamage, damageType, null);
 
         public void SimulationTick(float deltaTime)
         {

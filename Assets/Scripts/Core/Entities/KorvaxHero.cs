@@ -1,3 +1,4 @@
+using KOA.Core.Minions;
 using KOA.Data.Enums;
 using System;
 using UnityEngine;
@@ -20,6 +21,11 @@ namespace KOA.Core.Entities
         public const float Skill2ManaCost = 50.0f;
         public const float Skill2Duration = 5.0f;
 
+        // Skill 3: Concussive Blast (Section 6.3 E)
+        public const float Skill3CooldownDuration = 11.0f;
+        public const float Skill3ManaCost = 65.0f;
+        public const float Skill3Range = 4.5f;
+
         public const float UltimateCooldownDuration = 100.0f;
         public const float UltimateManaCost = 120.0f;
         public const float UltimateRange = 18.0f;
@@ -28,19 +34,22 @@ namespace KOA.Core.Entities
         // Timers
         public float Skill1CooldownRemaining { get; private set; } = 0f;
         public float Skill2CooldownRemaining { get; private set; } = 0f;
+        public float Skill3CooldownRemaining { get; private set; } = 0f;
         public float UltimateCooldownRemaining { get; private set; } = 0f;
         public float Skill2ActiveTimer { get; private set; } = 0f;
+        public float AttackCooldownRemaining { get; private set; } = 0f;
+        public float BaseAttackCooldown { get; set; } = 1.4f; // Sniper — สูงเหมือน Dota2 Sniper
 
         // Passive Momentum Piercer Stacks (0-5)
         public int PassiveStacks { get; private set; } = 0;
 
         // Navigation
         public Vector3 TargetDestination { get; private set; }
-        public bool IsMoving { get; private set; }
 
         // Events
         public event Action<Vector3, Vector3, bool> OnHeavyBoltFired;
         public event Action OnHuntersFocusActivated;
+        public event Action<Vector3, bool> OnConcussiveBlastFired;
         public event Action<Vector3, Vector3, bool> OnBallistaOverdriveFired;
 
         public KorvaxHero(Vector3 spawnPosition) : base(
@@ -50,7 +59,7 @@ namespace KOA.Core.Entities
             baseMana: 260f,
             baseArmor: 28f,
             baseMr: 26f,
-            baseAd: 68f,
+            baseAd: 52f,
             baseSpeed: 7.0f,
             attackRange: 6.5f,
             statGrowth: HeroStatGrowth.GetGrowthFor("Korvax")
@@ -73,17 +82,39 @@ namespace KOA.Core.Entities
             TargetDestination = Position;
         }
 
-        public float EffectiveRange => AttackRange + (Skill2ActiveTimer > 0f ? 1.5f : 0f);
+        public override bool TryBasicAttack(ITargetable target)
+        {
+            if (!IsAlive || target == null || !target.IsAlive) return false;
+            if (target.TeamId == TeamId && target.TeamId != -1) return false;
+
+            float distance = Vector3.Distance(Position, target.Position);
+            if (distance > (EffectiveRange + target.Radius)) return false;
+            if (AttackCooldownRemaining > 0f) return false;
+
+            Vector3 lookDir = (target.Position - Position).normalized;
+            if (lookDir.sqrMagnitude > 0.001f)
+            {
+                Rotation = Quaternion.LookRotation(new Vector3(lookDir.x, 0, lookDir.z));
+            }
+
+            target.TakeDamage(EffectiveAttackDamage, DamageType.Physical, HeroId);
+            AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
+            return true;
+        }
+
+        public bool TryBasicAttack(DummyTarget target) => TryBasicAttack((ITargetable)target);
+
+        public float EffectiveRange => AttackRange + (Skill2ActiveTimer > 0f ? (0.75f + Skill2Rank * 0.25f) : 0f);
 
         /// <summary>
         /// Skill 1: Heavy Bolt (SKILLSHOT_LINE) Section 6.3 & 6.5
         /// </summary>
-        public bool TryCastHeavyBolt(Vector3 aimWorldPos, DummyTarget dummyTarget)
+        public bool TryCastHeavyBolt(Vector3 aimWorldPos, ITargetable target = null)
         {
-            if (!IsAlive || Skill1CooldownRemaining > 0f) return false;
+            if (!IsAlive || Skill1Rank <= 0 || Skill1CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill1ManaCost)) return false;
 
-            Skill1CooldownRemaining = Skill1CooldownDuration;
+            Skill1CooldownRemaining = Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 0.8f);
 
             Vector3 aimDir = (aimWorldPos - Position);
             aimDir.y = 0;
@@ -95,13 +126,15 @@ namespace KOA.Core.Entities
             Vector3 endPos = Position + (aimDir * Skill1Range);
 
             bool hit = false;
-            if (dummyTarget != null && dummyTarget.IsAlive)
+            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
-                hit = Vector3.Distance(Position, dummyTarget.Position) <= Skill1Range;
+                hit = Vector3.Distance(Position, target.Position) <= Skill1Range;
                 if (hit)
                 {
-                    float damage = 150f + EffectiveAttackDamage;
-                    dummyTarget.TakeDamage(damage, DamageType.Physical);
+                    float baseDmg = 80f + (Skill1Rank - 1) * 50f;
+                    float adRatio = 0.8f + (Skill1Rank - 1) * 0.12f;
+                    float damage = baseDmg + (EffectiveAttackDamage * adRatio);
+                    target.TakeDamage(damage, DamageType.Physical, HeroId);
                 }
             }
 
@@ -109,30 +142,81 @@ namespace KOA.Core.Entities
             return true;
         }
 
+        public bool TryCastHeavyBolt(Vector3 aimWorldPos, DummyTarget dummyTarget) => TryCastHeavyBolt(aimWorldPos, (ITargetable)dummyTarget);
+
         /// <summary>
         /// Skill 2: Hunter's Focus (SELF_CAST) Section 6.3 & 6.5
         /// </summary>
         public bool TryCastHuntersFocus()
         {
-            if (!IsAlive || Skill2CooldownRemaining > 0f) return false;
+            if (!IsAlive || Skill2Rank <= 0 || Skill2CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill2ManaCost)) return false;
 
             Skill2CooldownRemaining = Skill2CooldownDuration;
-            Skill2ActiveTimer = Skill2Duration;
+            Skill2ActiveTimer = 3.0f + (Skill2Rank * 0.5f);
 
             OnHuntersFocusActivated?.Invoke();
             return true;
         }
 
         /// <summary>
+        /// Skill 3: Concussive Blast (SINGLE_TARGET / CONE) Section 6.3 E
+        /// ยิงกระสุนระเบิดผลักเป้าหมายตรงหน้าให้กระเด็นถอยหลัง 3.5m ทำดาเมจกายภาพและ Slow
+        /// </summary>
+        public bool TryCastConcussiveBlast(Vector3 aimWorldPos, ITargetable target = null)
+        {
+            if (!IsAlive || Skill3Rank <= 0 || Skill3CooldownRemaining > 0f) return false;
+            if (!TryConsumeMana(Skill3ManaCost)) return false;
+
+            float cd = Mathf.Max(6.5f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f);
+            Skill3CooldownRemaining = cd;
+
+            Vector3 blastDir = (aimWorldPos - Position);
+            blastDir.y = 0;
+            if (blastDir.sqrMagnitude < 0.01f) blastDir = Rotation * Vector3.forward;
+            blastDir.Normalize();
+
+            Rotation = Quaternion.LookRotation(blastDir);
+
+            bool hit = false;
+            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
+            {
+                float dist = Vector3.Distance(Position, target.Position);
+                if (dist <= Skill3Range + target.Radius)
+                {
+                    hit = true;
+                    float baseDmg = 70f + (Skill3Rank - 1) * 40f;
+                    float damage = baseDmg + (EffectiveAttackDamage * 0.50f);
+                    target.TakeDamage(damage, DamageType.Physical, HeroId);
+
+                    // ผลักศัตรูถอยหลัง 3.5m (ยกเว้นป้อม)
+                    Vector3 pushDir = (target.Position - Position).normalized;
+                    if (target is HeroBase3D heroTarget)
+                    {
+                        heroTarget.Position += pushDir * 3.5f;
+                    }
+                    else if (target is MinionEntity minionTarget)
+                    {
+                        minionTarget.Position += pushDir * 3.5f;
+                    }
+                }
+            }
+
+            OnConcussiveBlastFired?.Invoke(Position, hit);
+            return true;
+        }
+
+        public bool TryCastConcussiveBlast(Vector3 aimWorldPos, DummyTarget dummyTarget) => TryCastConcussiveBlast(aimWorldPos, (ITargetable)dummyTarget);
+
+        /// <summary>
         /// Ultimate: Ballista Overdrive (SKILLSHOT_LINE) Section 6.3
         /// </summary>
-        public bool TryCastBallistaOverdrive(Vector3 aimWorldPos, DummyTarget dummyTarget)
+        public bool TryCastBallistaOverdrive(Vector3 aimWorldPos, ITargetable target = null)
         {
-            if (!IsAlive || UltimateCooldownRemaining > 0f) return false;
+            if (!IsAlive || UltimateRank <= 0 || UltimateCooldownRemaining > 0f) return false;
             if (!TryConsumeMana(UltimateManaCost)) return false;
 
-            UltimateCooldownRemaining = UltimateCooldownDuration;
+            UltimateCooldownRemaining = 110f - (UltimateRank * 15f);
 
             Vector3 aimDir = (aimWorldPos - Position);
             aimDir.y = 0;
@@ -144,19 +228,23 @@ namespace KOA.Core.Entities
             Vector3 endPos = Position + (aimDir * UltimateRange);
 
             bool hit = false;
-            if (dummyTarget != null && dummyTarget.IsAlive)
+            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
-                hit = Vector3.Distance(Position, dummyTarget.Position) <= UltimateRange;
+                hit = Vector3.Distance(Position, target.Position) <= UltimateRange;
                 if (hit)
                 {
-                    float damage = 350f + (EffectiveAttackDamage * 1.4f);
-                    dummyTarget.TakeDamage(damage, DamageType.Physical);
+                    float baseDmg = 220f + (UltimateRank - 1) * 110f;
+                    float adRatio = 1.0f + (UltimateRank - 1) * 0.25f;
+                    float damage = baseDmg + (EffectiveAttackDamage * adRatio);
+                    target.TakeDamage(damage, DamageType.Physical, HeroId);
                 }
             }
 
             OnBallistaOverdriveFired?.Invoke(startPos, endPos, hit);
             return true;
         }
+
+        public bool TryCastBallistaOverdrive(Vector3 aimWorldPos, DummyTarget dummyTarget) => TryCastBallistaOverdrive(aimWorldPos, (ITargetable)dummyTarget);
 
         public override void SimulationTick(float deltaTime)
         {
@@ -166,8 +254,10 @@ namespace KOA.Core.Entities
 
             if (Skill1CooldownRemaining > 0f) Skill1CooldownRemaining -= deltaTime;
             if (Skill2CooldownRemaining > 0f) Skill2CooldownRemaining -= deltaTime;
+            if (Skill3CooldownRemaining > 0f) Skill3CooldownRemaining -= deltaTime;
             if (UltimateCooldownRemaining > 0f) UltimateCooldownRemaining -= deltaTime;
             if (Skill2ActiveTimer > 0f) Skill2ActiveTimer -= deltaTime;
+            if (AttackCooldownRemaining > 0f) AttackCooldownRemaining = UnityEngine.Mathf.Max(0f, AttackCooldownRemaining - deltaTime);
 
             if (IsMoving)
             {

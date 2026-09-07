@@ -20,6 +20,8 @@ namespace KOA.Core.Economy
 
         public int CurrentGold { get; private set; } = 500; // เงินตั้งต้นสำหรับซื้อไอเทมชิ้นแรก
         public int CurrentKillStreak { get; private set; } = 0;
+        public int TotalKills { get; private set; } = 0;
+        public int TotalDeaths { get; private set; } = 0;
 
         private float _passiveGoldAccumulator = 0f;
 
@@ -61,6 +63,7 @@ namespace KOA.Core.Economy
 
         public void RecordHeroKill()
         {
+            TotalKills++;
             CurrentKillStreak++;
             int bonus = Mathf.Min(CurrentKillStreak * StreakBonusStep, MaxStreakBonus);
             int totalBounty = BaseHeroKillGold + bonus;
@@ -70,6 +73,7 @@ namespace KOA.Core.Economy
 
         public void RecordDeath()
         {
+            TotalDeaths++;
             CurrentKillStreak = 0;
             OnStreakChanged?.Invoke(CurrentKillStreak);
         }
