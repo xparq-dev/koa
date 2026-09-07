@@ -1,17 +1,21 @@
 using KOA.Core.Input;
 using KOA.Data.Enums;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace KOA.Presentation.Input
 {
     /// <summary>
     /// PC Input Adapter ตาม Section 1.1 และ Section 7.2
     /// แปลงเมาส์และคีย์บอร์ด PC ให้เป็น InputFrame สำหรับ Simulation Core
+    /// รองรับทั้ง New Input System และ Legacy Input Manager อัตโนมัติ
     /// </summary>
     public class PCInputAdapter : MonoBehaviour, IInputAdapter
     {
         [Header("Raycast Settings")]
-        [SerializeField] private LayerMask groundLayerMask = ~0; // ทุก Layer หรือเฉพาะ Ground Layer
+        [SerializeField] private LayerMask groundLayerMask = ~0;
         [SerializeField] private UnityEngine.Camera targetCamera;
 
         private InputFrame _currentInput;
@@ -35,7 +39,20 @@ namespace KOA.Presentation.Input
         {
             if (targetCamera == null) return;
 
-            Ray ray = targetCamera.ScreenPointToRay(UnityEngine.Input.mousePosition);
+            Vector3 mouseScreenPos = Vector3.zero;
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null)
+            {
+                Vector2 mPos = Mouse.current.position.ReadValue();
+                mouseScreenPos = new Vector3(mPos.x, mPos.y, 0f);
+            }
+            else
+#endif
+            {
+                mouseScreenPos = UnityEngine.Input.mousePosition;
+            }
+
+            Ray ray = targetCamera.ScreenPointToRay(mouseScreenPos);
             Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
 
             if (groundPlane.Raycast(ray, out float enter))
@@ -51,7 +68,19 @@ namespace KOA.Presentation.Input
         private void HandleMovementInput()
         {
             // คลิกขวาเดิน (Click-to-move ตาม Section 7.2)
-            if (UnityEngine.Input.GetMouseButton(1))
+            bool isRightClick = false;
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null)
+            {
+                isRightClick = Mouse.current.rightButton.isPressed;
+            }
+            else
+#endif
+            {
+                isRightClick = UnityEngine.Input.GetMouseButton(1);
+            }
+
+            if (isRightClick)
             {
                 _currentInput.HasMoveTarget = true;
                 _currentInput.TargetDestination = _currentInput.AimVector;
@@ -60,35 +89,59 @@ namespace KOA.Presentation.Input
 
         private void HandleActionInput()
         {
-            // คลิกซ้าย หรือ A เพื่อโจมตี (Section 7.2)
-            if (UnityEngine.Input.GetMouseButtonDown(0) || UnityEngine.Input.GetKeyDown(KeyCode.A))
+            bool attackPressed = false;
+            bool qPressed = false;
+            bool wPressed = false;
+            bool ePressed = false;
+
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null && Keyboard.current != null)
+            {
+                attackPressed = Mouse.current.leftButton.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame;
+                qPressed = Keyboard.current.qKey.wasPressedThisFrame;
+                wPressed = Keyboard.current.wKey.wasPressedThisFrame;
+                ePressed = Keyboard.current.eKey.wasPressedThisFrame;
+
+                if (Keyboard.current.digit1Key.wasPressedThisFrame) ActiveItemSlotToUse = 0;
+                else if (Keyboard.current.digit2Key.wasPressedThisFrame) ActiveItemSlotToUse = 1;
+                else if (Keyboard.current.digit3Key.wasPressedThisFrame) ActiveItemSlotToUse = 2;
+                else if (Keyboard.current.digit4Key.wasPressedThisFrame) ActiveItemSlotToUse = 3;
+                else if (Keyboard.current.digit5Key.wasPressedThisFrame) ActiveItemSlotToUse = 4;
+                else if (Keyboard.current.digit6Key.wasPressedThisFrame) ActiveItemSlotToUse = 5;
+            }
+            else
+#endif
+            {
+                attackPressed = UnityEngine.Input.GetMouseButtonDown(0) || UnityEngine.Input.GetKeyDown(KeyCode.A);
+                qPressed = UnityEngine.Input.GetKeyDown(KeyCode.Q);
+                wPressed = UnityEngine.Input.GetKeyDown(KeyCode.W);
+                ePressed = UnityEngine.Input.GetKeyDown(KeyCode.E);
+
+                for (int i = 0; i < 6; i++)
+                {
+                    if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha1 + i))
+                    {
+                        ActiveItemSlotToUse = i;
+                        break;
+                    }
+                }
+            }
+
+            if (attackPressed)
             {
                 _currentInput.CastIntent = CastIntent.CastAttack;
             }
-            // ปุ่ม Q สำหรับ Skill 1 (Iron Cleave)
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.Q))
+            else if (qPressed)
             {
                 _currentInput.CastIntent = CastIntent.CastSkill1;
             }
-            // ปุ่ม W สำหรับ Skill 2
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.W))
+            else if (wPressed)
             {
                 _currentInput.CastIntent = CastIntent.CastSkill2;
             }
-            // ปุ่ม E สำหรับ Ultimate
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.E))
+            else if (ePressed)
             {
                 _currentInput.CastIntent = CastIntent.CastUltimate;
-            }
-
-            // ปุ่มตัวเลข 1 - 6 สำหรับ Active Item (Section 5.1 & Section 7.2)
-            for (int i = 0; i < 6; i++)
-            {
-                if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha1 + i))
-                {
-                    ActiveItemSlotToUse = i;
-                    break;
-                }
             }
         }
 

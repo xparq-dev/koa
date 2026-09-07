@@ -16,6 +16,16 @@ namespace KOA.Presentation.Views
 
         public MinionEntity Logic { get; private set; }
 
+        public void SetHealthBar(WorldSpaceHealthBar bar)
+        {
+            healthBar = bar;
+            if (healthBar != null && Logic != null)
+            {
+                healthBar.BindTarget(transform);
+                healthBar.SetHealth(Logic.CurrentHp, Logic.MaxHp);
+            }
+        }
+
         public void BindLogic(MinionEntity minionEntity)
         {
             Logic = minionEntity;

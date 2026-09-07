@@ -7,6 +7,9 @@ using KOA.Data.Models;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace KOA.Presentation.UI
 {
@@ -69,7 +72,19 @@ namespace KOA.Presentation.UI
             }
 
             // ปุ่ม P เพื่อเปิด/ปิดร้านค้า
-            if (UnityEngine.Input.GetKeyDown(KeyCode.P))
+            bool pPressed = false;
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+            {
+                pPressed = Keyboard.current.pKey.wasPressedThisFrame;
+            }
+            else
+#endif
+            {
+                pPressed = UnityEngine.Input.GetKeyDown(KeyCode.P);
+            }
+
+            if (pPressed)
             {
                 _isShopOpen = !_isShopOpen;
             }

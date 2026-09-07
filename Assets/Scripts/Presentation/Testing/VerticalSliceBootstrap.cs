@@ -1,18 +1,21 @@
 using KOA.Core.AI;
 using KOA.Core.Entities;
 using KOA.Core.Match;
+using KOA.Core.Minions;
 using KOA.Core.Structures;
 using KOA.Presentation.Camera;
 using KOA.Presentation.Input;
 using KOA.Presentation.UI;
 using KOA.Presentation.Views;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace KOA.Presentation.Testing
 {
     /// <summary>
     /// Auto Bootstrapper สำหรับทดสอบ Phase 3 เต็มรูปแบบ (Full Match Setup)
-    /// สร้างแผนที่ 1v1 เลนเดียว 70x20m, ป้อมปราการ 2 ฝั่ง, Player Hero, AI Bot (Easy/Med/Hard), Shop, และ MatchHUD
+    /// สร้างแผนที่ 1v1 เลนเดียว 70x20m, ป้อมปราการ 2 ฝั่ง, Player Hero, AI Bot (Easy/Med/Hard), Shop, Minion Waves, และ MatchHUD
+    /// พร้อม RuntimeInitializeOnLoadMethod เริ่มทำงานอัตโนมัติ 100% เมื่อกด Play ใน Unity โดยไม่ต้องลากวางเอง
     /// </summary>
     public class VerticalSliceBootstrap : MonoBehaviour
     {
@@ -28,10 +31,41 @@ namespace KOA.Presentation.Testing
         private GameObject _playerHeroGo;
         private HeroView _playerHeroView;
         private MatchHUD _matchHud;
+        private bool _isBuilt = false;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void AutoInitializeOnPlay()
+        {
+            if (FindAnyObjectByType<VerticalSliceBootstrap>() == null)
+            {
+                var runner = new GameObject("[KOA_MatchRunner]");
+                runner.AddComponent<VerticalSliceBootstrap>();
+                Debug.Log("<color=green>[KOA] Auto-started Duel Arena on Play Mode!</color>");
+            }
+        }
+
+#if UNITY_EDITOR
+        [UnityEditor.MenuItem("KOA/Setup Match in Current Scene")]
+        public static void SetupMatchInEditorMenu()
+        {
+            var existing = FindAnyObjectByType<VerticalSliceBootstrap>();
+            if (existing == null)
+            {
+                var runner = new GameObject("[KOA_MatchRunner]");
+                runner.AddComponent<VerticalSliceBootstrap>();
+                UnityEditor.Undo.RegisterCreatedObjectUndo(runner, "Create KOA MatchRunner");
+                Debug.Log("<color=green>[KOA] Created [KOA_MatchRunner] in scene!</color>");
+            }
+            else
+            {
+                Debug.Log("[KOA] [KOA_MatchRunner] already exists in scene.");
+            }
+        }
+#endif
 
         private void Awake()
         {
-            if (autoBuildOnStart && _playerHeroGo == null)
+            if (autoBuildOnStart && !_isBuilt)
             {
                 BuildFullArena();
             }
@@ -39,7 +73,7 @@ namespace KOA.Presentation.Testing
 
         private void Start()
         {
-            if (autoBuildOnStart && _playerHeroGo == null)
+            if (autoBuildOnStart && !_isBuilt)
             {
                 BuildFullArena();
             }
@@ -47,7 +81,7 @@ namespace KOA.Presentation.Testing
 
         private void OnEnable()
         {
-            if (autoBuildOnStart && _playerHeroGo == null)
+            if (autoBuildOnStart && !_isBuilt)
             {
                 BuildFullArena();
             }
@@ -61,8 +95,8 @@ namespace KOA.Presentation.Testing
 
         private void OnGUI()
         {
-            // หากระบบยังไม่ได้ถูกสร้าง (เช่น กรณีเพิ่ม Script ขณะกำลังรัน Play Mode อยู่)
-            if (_playerHeroGo == null)
+            // หากระบบยังไม่ได้ถูกสร้าง (เช่น กรณีสร้าง GameObject เปล่าขึ้นมาใน Editor)
+            if (!_isBuilt)
             {
                 int btnWidth = 320;
                 int btnHeight = 60;
@@ -91,10 +125,13 @@ namespace KOA.Presentation.Testing
 
         public void BuildFullArena()
         {
+            if (_isBuilt) return;
+            _isBuilt = true;
+
             Debug.Log("[Bootstrap] Initializing KOA Full Match Arena (Phase 3)...");
 
             // 1. Directional Light
-            if (FindObjectOfType<Light>() == null)
+            if (FindAnyObjectByType<Light>() == null)
             {
                 GameObject lightGo = new GameObject("Directional Light");
                 Light dirLight = lightGo.AddComponent<Light>();
@@ -110,7 +147,7 @@ namespace KOA.Presentation.Testing
             ground.GetComponent<Renderer>().material.color = new Color(0.20f, 0.23f, 0.22f);
 
             // 3. DamagePopupManager
-            if (FindObjectOfType<DamagePopupManager>() == null)
+            if (FindAnyObjectByType<DamagePopupManager>() == null)
             {
                 new GameObject("DamagePopupManager").AddComponent<DamagePopupManager>();
             }
@@ -119,6 +156,10 @@ namespace KOA.Presentation.Testing
             Vector3 blueFountain = new Vector3(0, 0, -32f);
             Vector3 redFountain = new Vector3(0, 0, 32f);
             MatchSimulation = new MatchSimulation(blueFountain, redFountain);
+
+            // Hook Minion wave visuals
+            MatchSimulation.BlueSpawner.OnWaveSpawned += HandleWaveVisuals;
+            MatchSimulation.RedSpawner.OnWaveSpawned += HandleWaveVisuals;
 
             // 5. สร้างป้อมปราการใน Scene ทั้ง 2 ฝั่ง (Section 3.3)
             SpawnTowerView(MatchSimulation.BlueOuterTower, "BlueOuterTower", Color.cyan);
@@ -169,6 +210,31 @@ namespace KOA.Presentation.Testing
             Debug.Log("[Bootstrap] Phase 3 Ready! Press [P] to toggle Shop, 1-6 for Items, Right-click to Move.");
         }
 
+        private void HandleWaveVisuals(List<MinionEntity> wave)
+        {
+            foreach (var minion in wave)
+            {
+                SpawnMinionView(minion);
+            }
+        }
+
+        private void SpawnMinionView(MinionEntity minion)
+        {
+            GameObject minionGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            minionGo.name = $"{minion.MinionId}_{minion.Type}";
+            minionGo.transform.position = minion.Position;
+            minionGo.transform.localScale = minion.Type == MinionType.Melee 
+                ? new Vector3(0.8f, 0.8f, 0.8f) 
+                : new Vector3(0.6f, 0.6f, 0.6f);
+
+            Color barColor = minion.TeamId == 0 ? Color.cyan : Color.red;
+            var hb = CreateHealthBar(minionGo.transform, $"{minion.MinionId}_HealthBar", barColor);
+
+            MinionView view = minionGo.AddComponent<MinionView>();
+            view.BindLogic(minion);
+            view.SetHealthBar(hb);
+        }
+
         private void SpawnPlayerHero(string heroName)
         {
             if (_playerHeroGo != null)
@@ -199,7 +265,7 @@ namespace KOA.Presentation.Testing
 
             CreateHealthBar(_playerHeroGo.transform, "PlayerHealthBar", Color.green);
 
-            PCInputAdapter inputAdapter = _playerHeroGo.AddComponent<PCInputAdapter>();
+            _playerHeroGo.AddComponent<PCInputAdapter>();
             _playerHeroView = _playerHeroGo.AddComponent<HeroView>();
             _playerHeroView.BindHero(CurrentPlayerHero);
 
@@ -243,7 +309,7 @@ namespace KOA.Presentation.Testing
             view.BindLogic(tower);
         }
 
-        private void CreateHealthBar(Transform parentTarget, string barName, Color color)
+        private WorldSpaceHealthBar CreateHealthBar(Transform parentTarget, string barName, Color color)
         {
             GameObject barRoot = new GameObject(barName);
             WorldSpaceHealthBar wsHealthBar = barRoot.AddComponent<WorldSpaceHealthBar>();
@@ -266,6 +332,8 @@ namespace KOA.Presentation.Testing
             Destroy(fillQuad.GetComponent<Collider>());
             fillQuad.GetComponent<Renderer>().material = new Material(Shader.Find("Sprites/Default"));
             fillQuad.GetComponent<Renderer>().material.color = color;
+
+            return wsHealthBar;
         }
     }
 }

@@ -1,10 +1,14 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace KOA.Presentation.Camera
 {
     /// <summary>
     /// ระบบกล้อง Top-down Isometric 50 องศา ตาม Section 7.1
     /// รองรับ Zoom 8-14m และ Soft-lerp พร้อม Look-ahead
+    /// รองรับทั้ง New Input System และ Legacy Input Manager
     /// </summary>
     public class TopDownCameraController : MonoBehaviour
     {
@@ -74,7 +78,22 @@ namespace KOA.Presentation.Camera
 
         private void HandleZoomInput()
         {
-            float scroll = UnityEngine.Input.GetAxis("Mouse ScrollWheel");
+            float scroll = 0f;
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null)
+            {
+                float scrollY = Mouse.current.scroll.ReadValue().y;
+                if (Mathf.Abs(scrollY) > 0.01f)
+                {
+                    scroll = Mathf.Sign(scrollY) * 0.2f;
+                }
+            }
+            else
+#endif
+            {
+                scroll = UnityEngine.Input.GetAxis("Mouse ScrollWheel");
+            }
+
             if (Mathf.Abs(scroll) > 0.01f)
             {
                 currentDistance = Mathf.Clamp(currentDistance - (scroll * zoomSpeed * 5f), minDistance, maxDistance);
