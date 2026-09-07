@@ -57,7 +57,7 @@ Simulation Core **ไม่รับรู้เลย** ว่าคำสั�
 EXP_Required(level) = 200 * (level ^ 1.3)
 ```
 
-**Stat Growth ต่อ Level (ค่าคงที่ ไม่ใช้ระบบ primary attribute แบบ DOTA เพื่อความง่ายใน 1.0.0):**
+**Stat Growth ต่อ Level (ค่าคงที่ ไม่ใช้ระบบ primary attribute เพื่อความเรียบง่ายใน 1.0.0):**
 
 | Hero | +HP/lv | +Armor/lv | +MR/lv | +AD/lv | +Mana/lv |
 |---|---|---|---|---|---|
@@ -84,7 +84,7 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
   - Blue Fountain: Z = -60m, Blue Nexus: Z = -46m, Blue Inner Tower: Z = -32m, Blue Outer Tower: Z = -14m
   - Red Outer Tower: Z = +14m, Red Inner Tower: Z = +32m, Red Nexus: Z = +46m, Red Fountain: Z = +60m
   - พื้นที่ปะทะกลางเลน (Center Clash Zone): ระหว่าง Outer Towers กว้าง 28 เมตร (Z = -14m ถึง +14m)
-- **Fountain Zone:** รัศมี 7.5 เมตร อยู่ด้านหลัง Nexus แต่ละฝั่ง มี HP/Mana regen แบบ LoL (~11% Max HP-MP/sec ใช้เวลาประมาณ 8-10 วินาทีเต็มหลอด) และ invulnerability
+- **Fountain Zone:** รัศมี 7.5 เมตร อยู่ด้านหลัง Nexus แต่ละฝั่ง มี HP/Mana regen สไตล์ Inspire MOBA (~11% Max HP-MP/sec ใช้เวลาประมาณ 8-10 วินาทีเต็มหลอด) และ invulnerability
 - **Bush/พุ่มหญ้า:** วางไว้ 2 จุด สมมาตรกันบริเวณกึ่งกลางเลน (X = -8m และ X = +8m, Z = -4m ถึง +4m)
 - **ไม่มี Jungle Camp / Neutral Monster** ใน 1.0.0
 
@@ -267,9 +267,9 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 - กล้อง follow ตัวละครผู้เล่นแบบ soft-lerp พร้อม look-ahead เล็กน้อยตามทิศทางเคลื่อนที่
 
 ### 7.2 PC Control Scheme (Scope จริงของ 1.0.0)
-- **เคลื่อนที่:** Right-click (Click-to-move) แบบ DOTA มาตรฐาน
+- **เคลื่อนที่:** Right-click (Click-to-move) มาตรฐาน Inspire MOBA
 - **โจมตี:** Left-click ที่ศัตรู หรือกด A แล้ว click (Attack-move)
-- **สกิล (4 สกิลเต็มรูปแบบ สไตล์ MOBA/Dota 2):**
+- **สกิล (4 สกิลเต็มรูปแบบ สไตล์ Inspire MOBA):**
   - **Q:** Skill 1
   - **W:** Skill 2
   - **E:** Skill 3

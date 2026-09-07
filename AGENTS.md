@@ -12,3 +12,8 @@
 - Engine: Unity 3D URP, ภาษา C#
 - ตอนนี้กำลังอยู่ Phase 3 (ฮีโร่ครบ 4 ตัว + Shop + Balance) ของ Roadmap — เช็คตาราง task ในไฟล์ roadmap ก่อนเริ่มงานทุกครั้ง
 - อ้างอิง Section เลขจาก Requirement เสมอเวลาอธิบายงาน (เช่น "ตาม Section 6.1")
+
+## กฎการอ้างอิงและทรัพย์สินทางปัญญา (Inspire MOBA Policy)
+- **ห้ามระบุชื่อเกมเชิงพาณิชย์ของค่ายอื่นเด็ดขาด** (เช่น League of Legends, LOL, LoL, Dota, Dota 2, ROV, Arena of Valor, Mobile Legends เป็นต้น) ในโค้ด คอมเมนต์ XML docs, commit message หรือเอกสาร Requirement ต่างๆ เพื่อป้องกันปัญหาลิขสิทธิ์และเครื่องหมายการค้า
+- **การอ้างอิงแรงบันดาลใจ:** ให้ใช้คำกลางว่า **"Inspire MOBA"** หรือ **"MOBA Standard"** เท่านั้น
+- **สิ่งที่คิดค้นหรือออกแบบเอง:** ให้ใช้ชื่อ **"Project KOA"** หรือชื่อระบบเฉพาะของ KOA ตามปกติ

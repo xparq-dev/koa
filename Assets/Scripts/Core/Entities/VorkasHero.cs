@@ -153,7 +153,7 @@ namespace KOA.Core.Entities
             Vector3 endPos = Position + (aimDir * Skill1Range);
 
             bool hit = false;
-            // Dota 2 style: Rank 1: 75, Rank 2: 125, Rank 3: 175, Rank 4: 225
+            // Inspire MOBA: Rank 1: 75, Rank 2: 125, Rank 3: 175, Rank 4: 225
             float baseDmg = 75f + (Skill1Rank - 1) * 50f;
             float adRatio = 0.7f + (Skill1Rank - 1) * 0.1f;
             float damage = baseDmg + (EffectiveAttackDamage * adRatio);

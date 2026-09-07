@@ -9,12 +9,15 @@ using UnityEngine;
 
 namespace KOA.Editor
 {
-    public static class Dota2ProgressionVerification
+    /// <summary>
+    /// Test Suite สำหรับทดสอบระบบความก้าวหน้าสกิล พรสวรรค์ และความสมดุล (Inspire MOBA Progression)
+    /// </summary>
+    public static class SkillProgressionVerification
     {
-        [MenuItem("KOA/Run Dota2 Balance & Skill Tests")]
+        [MenuItem("KOA/Run Skill Progression & Balance Tests")]
         public static void RunAllTests()
         {
-            Debug.Log("<color=cyan><b>[KOA Test Suite] Starting Dota 2 Progression & Balance Verification...</b></color>");
+            Debug.Log("<color=cyan><b>[KOA Test Suite] Starting KOA Skill Progression & Balance Verification...</b></color>");
             int passed = 0;
             int total = 0;
 

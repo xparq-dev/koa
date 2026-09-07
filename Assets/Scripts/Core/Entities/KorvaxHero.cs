@@ -38,7 +38,7 @@ namespace KOA.Core.Entities
         public float UltimateCooldownRemaining { get; private set; } = 0f;
         public float Skill2ActiveTimer { get; private set; } = 0f;
         public float AttackCooldownRemaining { get; private set; } = 0f;
-        public float BaseAttackCooldown { get; set; } = 1.4f; // Sniper — สูงเหมือน Dota2 Sniper
+        public float BaseAttackCooldown { get; set; } = 1.4f; // Sniper — อัตราโจมตีช้าแต่ระยะยิงไกลและรุนแรง
 
         // Passive Momentum Piercer Stacks (0-5)
         public int PassiveStacks { get; private set; } = 0;
