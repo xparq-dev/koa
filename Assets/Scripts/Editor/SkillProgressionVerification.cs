@@ -30,7 +30,7 @@ namespace KOA.Editor
 
                 Assert(v.BaseAttackDamage == 54f, $"Vorkas BaseAD expected 54, got {v.BaseAttackDamage}");
                 Assert(z.BaseAttackDamage == 44f, $"Zenthis BaseAD expected 44, got {z.BaseAttackDamage}");
-                Assert(k.BaseAttackDamage == 52f, $"Korvax BaseAD expected 52, got {k.BaseAttackDamage}");
+                Assert(k.BaseAttackDamage == 46f, $"Korvax BaseAD expected 46 (Balance Pass), got {k.BaseAttackDamage}");
                 Assert(g.BaseAttackDamage == 48f, $"Gravitor BaseAD expected 48, got {g.BaseAttackDamage}");
             });
 

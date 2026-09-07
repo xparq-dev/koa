@@ -59,7 +59,7 @@ namespace KOA.Core.Entities
             baseMana: 260f,
             baseArmor: 28f,
             baseMr: 26f,
-            baseAd: 52f,
+            baseAd: 46f,           // Balance Pass: 52 → 46 (Ranged ไม่ควร AD เท่า Melee Tank)
             baseSpeed: 7.0f,
             attackRange: 6.5f,
             statGrowth: HeroStatGrowth.GetGrowthFor("Korvax")

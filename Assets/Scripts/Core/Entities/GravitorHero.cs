@@ -54,9 +54,9 @@ namespace KOA.Core.Entities
         public GravitorHero(Vector3 spawnPosition) : base(
             heroId: "hero_gravitor",
             displayName: "Gravitor",
-            baseHp: 700f,
+            baseHp: 660f,          // Balance Pass: 700 → 660 (ลด early unkillable)
             baseMana: 240f,
-            baseArmor: 42f,
+            baseArmor: 36f,        // Balance Pass: 42 → 36 (ลด armor reduction จาก 29.5% → 26.5%)
             baseMr: 36f,
             baseAd: 48f,
             baseSpeed: 6.9f,
@@ -255,9 +255,10 @@ namespace KOA.Core.Entities
             if (!IsAlive) return;
 
             // Passive: Antigravity Shield (Section 6.4)
+            // Balance Pass: ลด shield จาก 15% → 10% MaxHP เพื่อลด burst survivability
             if (PassiveCooldownRemaining <= 0f && CurrentShield <= 0f)
             {
-                CurrentShield = EffectiveMaxHp * 0.15f; // โล่ 15% Max HP
+                CurrentShield = EffectiveMaxHp * 0.10f; // โล่ 10% Max HP (Balance Pass)
                 PassiveCooldownRemaining = PassiveInternalCooldown;
             }
 
