@@ -19,6 +19,8 @@ namespace KOA.Core.Minions
     /// </summary>
     public class MinionEntity : ITargetable
     {
+        public const string IdPrefix = "minion_";
+
         public string MinionId { get; private set; }
         public string TargetId => MinionId;
         public MinionType Type { get; private set; }
@@ -52,6 +54,7 @@ namespace KOA.Core.Minions
 
         public event Action<float, float> OnHealthChanged;
         public event Action<float, DamageType> OnDamageTaken;
+        public event Action<float, DamageType, string> OnDamageTakenWithSource;
         public event Action<Vector3> OnAttackExecuted; // targetPos
         public event Action<MinionEntity, string> OnKilled; // minion, killerId
 
@@ -135,12 +138,19 @@ namespace KOA.Core.Minions
 
             CurrentHp = Mathf.Max(0f, CurrentHp - netDamage);
             OnDamageTaken?.Invoke(netDamage, damageType);
+            OnDamageTakenWithSource?.Invoke(netDamage, damageType, attackerId);
             OnHealthChanged?.Invoke(CurrentHp, MaxHp);
 
             if (CurrentHp <= 0f)
             {
                 OnKilled?.Invoke(this, attackerId);
             }
+        }
+
+        public static bool IsMinionId(string entityId)
+        {
+            return !string.IsNullOrEmpty(entityId)
+                && entityId.StartsWith(IdPrefix, StringComparison.Ordinal);
         }
 
         public void SimulationTick(float deltaTime, Vector3 targetLaneDestination)

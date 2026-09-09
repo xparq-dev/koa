@@ -30,7 +30,10 @@ Project KOA เป็นเกม MOBA แบบ 1v1 บนแผนที่เ
 - ฮีโร่แต่ละตัวมี Passive และ Q/W/E/R ตาม Requirement Section 6.1-6.4
 - Mana ฟื้นอัตโนมัตินอก Fountain และฟื้นเร็วขึ้นภายใน Fountain
 - HUD แยกสถานะ READY, COOLDOWN, NO MANA และ UNLEARNED/LOCKED
-- เมื่อร่ายไม่สำเร็จจะแสดงเหตุผลและมีเสียงตอบสนอง
+- เมื่อร่ายไม่สำเร็จจะแสดงเหตุผลแบบข้อความเดี่ยวในพื้นที่ว่างกึ่งกลางใต้ Top Bar และมีเสียงตอบสนอง โดยไม่สะสมทับ Mini Map หรือ HUD ส่วนอื่น
+- Targeting แยกตามชนิดสกิล: Single Target ต้องชี้ศัตรูในระยะก่อนและไม่เสีย Mana/Cooldown เมื่อไม่ผ่าน, Ground AOE ต้องอยู่ใน Arena, ส่วน Direction Skillshot สามารถยิงพลาดและเสียทรัพยากรตามปกติ
+- Tooltip Q/W/E/R ระบุชัดว่าเป็น Enemy Target, Direction Skillshot, Ground Area หรือ Self Cast
+- Damage Popup แสดงค่าดาเมจจริงหลังหักเกราะเพียงครั้งเดียว และซ่อนตัวเลขเมื่อครีปตีกันเองเพื่อลดความสับสนระหว่างการต่อสู้
 - เอฟเฟกต์ของฮีโร่ ป้อม และครีปใช้ textured particle, projectile, ground glyph และ impact
 - Idle, Walk, Attack, Cast และ Death แยกสถานะ โดยจังหวะโจมตี/ร่ายเริ่มจาก Core success event
 - Base movement pace ปรับตาม Requirement Section 6.5.2
@@ -59,12 +62,14 @@ Project KOA เป็นเกม MOBA แบบ 1v1 บนแผนที่เ
 - Mini Map มุมซ้ายบน แสดง Fountain, Tower, Nexus, ครีป และฮีโร่ตามกฎ Vision/Brush
 - Mini Map ย่อ/ขยายได้ คลิกซ้ายเพื่อเลื่อนกล้อง และคลิกขวาเพื่อส่งคำสั่งเดิน
 - กล้องมีสถานะ FREE และ LOCKED พร้อมปุ่มแสดงสถานะบน HUD
+- มุมกล้อง pitch 60° / yaw -45° / vertical FOV 46° / ระยะเริ่ม 24 เมตร (ซูม 18-32 เมตร) ทำให้แนว Blue → Red พาดจากซ้ายล่างไปขวาบน โดยไม่หมุนพิกัด Simulation Core และให้ระยะมองสนามที่อ่านการต่อสู้ได้ชัดขึ้น
 - Edge Pan, scroll zoom, Space focus/temporary lock และ Y toggle lock
 - HUD ป้องกันการคลิกทะลุไปเป็นคำสั่งเดินหรือเลือกเป้าหมาย
 - Hero & Bot Controls ย่อ/ขยายได้
 - Hover Q/W/E/R เพื่อดูชื่อ Mana Cost, Base Cooldown และรายละเอียดสกิล
 - F1 เปิด Hero Profile ซึ่งมี Model Preview, Role, Lore, Passive และ Q/W/E/R
-- UI ใช้กรอบและเสียง CC0 ที่คัดเลือกไว้ใน Asset Manifest
+- UI ใช้กรอบสีเข้มแบบบางที่ปรับตามความละเอียดและเสียง CC0 ที่คัดเลือกไว้ใน Asset Manifest; กรอบภาพทดลองถูกปิดจาก HUD ระหว่างเล่นหลัง visual QA พบว่ารบกวนการอ่านข้อมูล
+- Ability Feedback แยกจาก Kill Feed: Cooldown/NO MANA/UNLEARNED แสดงทีละข้อความใน safe area ระหว่าง Mini Map กับแผงควบคุม ส่วน Kill Feed จำกัด 3 รายการและเลื่อนลงอัตโนมัติเมื่อ Ability Feedback แสดงอยู่
 
 ## การควบคุมบน PC
 

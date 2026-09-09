@@ -1,4 +1,5 @@
 using KOA.Data.Enums;
+using KOA.Core.World;
 using System;
 using UnityEngine;
 
@@ -244,6 +245,7 @@ namespace KOA.Core.Entities
         public bool TryCastRebellionImpact(Vector3 aimWorldPos, System.Collections.Generic.IEnumerable<ITargetable> targets = null)
         {
             if (!IsAlive || UltimateRank <= 0 || UltimateCooldownRemaining > 0f) return false;
+            if (!ArenaBounds.Contains(aimWorldPos)) return false;
             if (!TryConsumeMana(UltimateManaCost)) return false;
 
             float cd = ApplyAbilityCooldownReduction(Mathf.Max(60.0f, UltimateCooldownDuration - (UltimateRank - 1) * 10.0f));

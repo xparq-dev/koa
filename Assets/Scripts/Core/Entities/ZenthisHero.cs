@@ -1,4 +1,5 @@
 using KOA.Data.Enums;
+using KOA.Core.World;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -113,6 +114,7 @@ namespace KOA.Core.Entities
         public bool TryCastSacredHourglass(Vector3 targetGroundPos, ITargetable target = null)
         {
             if (!IsAlive || Skill1Rank <= 0 || Skill1CooldownRemaining > 0f) return false;
+            if (!ArenaBounds.Contains(targetGroundPos)) return false;
             if (!TryConsumeMana(Skill1ManaCost)) return false;
 
             Skill1CooldownRemaining = ApplyAbilityCooldownReduction(Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 1.0f));

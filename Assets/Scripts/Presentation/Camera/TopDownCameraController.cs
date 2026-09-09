@@ -7,25 +7,33 @@ using UnityEngine.InputSystem;
 namespace KOA.Presentation.Camera
 {
     /// <summary>
-    /// ระบบกล้อง Top-down Isometric 50 องศา ตาม Section 7.1
-    /// รองรับ Zoom 8-14m, Free Camera, Edge Pan และ Focus/Lock
+    /// ระบบกล้อง Top-down Perspective ตาม Section 7.1
+    /// รองรับ Zoom 18-32m, Free Camera, Edge Pan และ Focus/Lock
     /// รองรับทั้ง New Input System และ Legacy Input Manager
     /// </summary>
     public class TopDownCameraController : MonoBehaviour
     {
+        public const float DefaultPitchAngle = 60.0f;
+        public const float DefaultPresentationYaw = -45.0f;
+        public const float DefaultFieldOfView = 46.0f;
+        public const float DefaultCameraDistance = 24.0f;
+        public const float MinimumCameraDistance = 18.0f;
+        public const float MaximumCameraDistance = 32.0f;
+
         [Header("Target Tracking")]
         [SerializeField] private Transform target;
         [SerializeField] private float smoothSpeed = 5.0f;
         [SerializeField] private float lookAheadFactor = 1.2f;
 
         [Header("Camera Isometric Angle (Section 7.1)")]
-        [SerializeField] private float pitchAngle = 50.0f; // มุม 50 องศาคงที่
-        [SerializeField] private float yawAngle = 0.0f;
+        [SerializeField] private float pitchAngle = DefaultPitchAngle;
+        [SerializeField] private float yawAngle = DefaultPresentationYaw;
+        [SerializeField] private float perspectiveFieldOfView = DefaultFieldOfView;
 
-        [Header("Zoom Settings (Section 7.1: 8 - 14 meters)")]
-        [SerializeField] private float currentDistance = 11.5f;
-        [SerializeField] private float minDistance = 8.0f;
-        [SerializeField] private float maxDistance = 14.0f;
+        [Header("Zoom Settings (Section 7.1: 18 - 32 meters)")]
+        [SerializeField] private float currentDistance = DefaultCameraDistance;
+        [SerializeField] private float minDistance = MinimumCameraDistance;
+        [SerializeField] private float maxDistance = MaximumCameraDistance;
         [SerializeField] private float zoomSpeed = 4.0f;
 
         [Header("Free Camera Controls")]
@@ -56,6 +64,18 @@ namespace KOA.Presentation.Camera
 
         public bool IsLocked => _persistentLock || _spaceHeld;
         public bool IsPermanentlyLocked => _persistentLock;
+
+        public void UseDefaultPresentationHeading()
+        {
+            pitchAngle = DefaultPitchAngle;
+            yawAngle = DefaultPresentationYaw;
+            perspectiveFieldOfView = DefaultFieldOfView;
+            minDistance = MinimumCameraDistance;
+            maxDistance = MaximumCameraDistance;
+            currentDistance = DefaultCameraDistance;
+            ApplyLensSettings();
+            if (_hasFocusPoint) ApplyCameraTransform(true);
+        }
 
         public void TogglePersistentLock()
         {
@@ -97,12 +117,7 @@ namespace KOA.Presentation.Camera
 
         private void Start()
         {
-            UnityEngine.Camera controlledCamera = GetComponent<UnityEngine.Camera>();
-            if (controlledCamera != null)
-            {
-                controlledCamera.nearClipPlane = nearClipPlane;
-                controlledCamera.farClipPlane = farClipPlane;
-            }
+            ApplyLensSettings();
 
             _persistentLock = startPermanentlyLocked;
             if (target != null)
@@ -112,6 +127,15 @@ namespace KOA.Presentation.Camera
             }
 
             ApplyCameraTransform(true);
+        }
+
+        private void ApplyLensSettings()
+        {
+            UnityEngine.Camera controlledCamera = GetComponent<UnityEngine.Camera>();
+            if (controlledCamera == null) return;
+            controlledCamera.nearClipPlane = nearClipPlane;
+            controlledCamera.farClipPlane = farClipPlane;
+            controlledCamera.fieldOfView = perspectiveFieldOfView;
         }
 
         private void Update()
@@ -206,17 +230,19 @@ namespace KOA.Presentation.Camera
 #endif
                 mousePosition = UnityEngine.Input.mousePosition;
 
-            Vector3 direction = Vector3.zero;
-            if (mousePosition.x <= edgePanBorderPixels) direction.x -= 1f;
-            else if (mousePosition.x >= Screen.width - edgePanBorderPixels) direction.x += 1f;
-            if (mousePosition.y <= edgePanBorderPixels) direction.z -= 1f;
-            else if (mousePosition.y >= Screen.height - edgePanBorderPixels) direction.z += 1f;
+            Vector2 screenDirection = Vector2.zero;
+            if (mousePosition.x <= edgePanBorderPixels) screenDirection.x -= 1f;
+            else if (mousePosition.x >= Screen.width - edgePanBorderPixels) screenDirection.x += 1f;
+            if (mousePosition.y <= edgePanBorderPixels) screenDirection.y -= 1f;
+            else if (mousePosition.y >= Screen.height - edgePanBorderPixels) screenDirection.y += 1f;
 
-            if (direction.sqrMagnitude > 1f) direction.Normalize();
-            if (direction.sqrMagnitude > 0f)
+            if (screenDirection.sqrMagnitude > 1f) screenDirection.Normalize();
+            if (screenDirection.sqrMagnitude > 0f)
             {
                 float distanceScale = Mathf.Lerp(0.82f, 1.18f, Mathf.InverseLerp(minDistance, maxDistance, currentDistance));
-                _cameraFocusPoint += direction * (edgePanSpeed * distanceScale * Time.unscaledDeltaTime);
+                Quaternion heading = Quaternion.Euler(0f, yawAngle, 0f);
+                Vector3 worldDirection = heading * new Vector3(screenDirection.x, 0f, screenDirection.y);
+                _cameraFocusPoint += worldDirection * (edgePanSpeed * distanceScale * Time.unscaledDeltaTime);
                 ClampFocusPoint();
             }
         }

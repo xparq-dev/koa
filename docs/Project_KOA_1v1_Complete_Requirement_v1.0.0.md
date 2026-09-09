@@ -257,15 +257,15 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 ### 6.5 Ability Target Type Taxonomy (จัดหมวดให้เป็นระบบ)
 เพื่อให้ implement แบบ data-driven ได้ ทุกสกิลต้องจัดอยู่ใน 1 ใน 4 ประเภทนี้:
 1. **`SKILLSHOT_LINE`** — ยิงเป็นเส้นตรงตามทิศ aimVector (เช่น Iron Cleave, Heavy Bolt, Ballista Overdrive, Temporal Rift)
-2. **`GROUND_TARGET_AOE`** — เลือกพิกัดบนพื้น เกิด effect เป็นวงกลม (เช่น Sacred Hourglass, Seismic Slam, Graviton Well, Rebellion Impact, Gravity Kore Collapse)
+2. **`GROUND_TARGET_AOE`** — เลือกพิกัดบนพื้น เกิด effect เป็นวงกลม (เช่น Sacred Hourglass, Graviton Well, Rebellion Impact, Gravity Kore Collapse)
 3. **`SINGLE_TARGET`** — ล็อกเป้าหมายเดี่ยว (เช่น Magnetic Pull, Concussive Blast)
-4. **`SELF_CAST`** — ใช้กับตัวเองทันที ไม่ต้อง aim (เช่น Vanguard's Will, Hunter's Focus, Aura of Eternity, Repulsion Zone, Grand Rewind)
+4. **`SELF_CAST`** — ใช้กับตัวเองหรือพื้นที่รอบตัวทันที ไม่ต้อง aim (เช่น Vanguard's Will, Seismic Slam, Hunter's Focus, Aura of Eternity, Repulsion Zone, Grand Rewind)
 
 ### 6.5.1 Combat Readability และ Resource Feedback
 
 - Mana ฟื้นอัตโนมัติขณะมีชีวิตและอยู่นอก Fountain ที่ **1.25% ของ Max Mana ต่อวินาที**; Fountain regeneration ตาม Section 3.1 ยังคงเร็วกว่าและไม่ซ้อนกับค่านี้
 - HUD ของ Q/W/E/R ต้องแยกสถานะ READY, COOLDOWN, NO MANA, UNLEARNED/LOCKED ห้ามแสดง READY เมื่อ Mana ไม่พอ
-- เมื่อกดสกิลไม่สำเร็จ ต้องมีข้อความและเสียงตอบสนองที่ระบุสาเหตุ เช่น Mana ไม่พอ, ยังไม่เรียน หรือยังติด Cooldown
+- เมื่อกดสกิลไม่สำเร็จ ต้องมีข้อความและเสียงตอบสนองที่ระบุสาเหตุ เช่น Mana ไม่พอ, ยังไม่เรียน หรือยังติด Cooldown; ข้อความนี้ต้องแสดงทีละรายการใน Ability Feedback บริเวณกึ่งกลางใต้ Top Bar แยกจาก Kill Feed และคำนวณ safe area เพื่อไม่ทับ Mini Map หรือแผงควบคุม
 - สกิลทั้ง 16 ท่าต้องแยกอ่านได้ด้วยอย่างน้อย 3 มิติ: สีประจำชุด, รูปทรง/วิถี (slash, projectile, aura, ground glyph, vortex) และจังหวะ impact
 - เอฟเฟกต์โจมตีจริงของฮีโร่ ป้อม และครีปต้องใช้ textured particle/projectile; เส้นเรขาคณิตให้ใช้เฉพาะ telegraph ที่ช่วยอ่านระยะและต้องไม่กลบเป้าหมาย
 - Animation Idle, Walk, Attack, Cast, Death ต้องแยก state ชัดเจน การโจมตี/ร่ายเริ่มจาก Core success event เท่านั้น และต้องกลับสู่ neutral idle หลังจบ state
@@ -281,6 +281,17 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 | Lane Minion | 3.25 m/s |
 
 ไอเทม, Talent, Buff และ Slow คำนวณต่อจากค่า Base นี้ตาม Section 5 และ Section 6.6 โดย visual locomotion ต้องปรับ playback rate ให้เท้าสัมพันธ์กับระยะเคลื่อนที่
+
+### 6.5.3 Target Validation และ Resource Commitment
+
+| Target Type | กฎก่อนใช้ Mana/Cooldown | ผลเมื่อไม่โดนศัตรู |
+|---|---|---|
+| `SINGLE_TARGET` | ต้องมีศัตรูมีชีวิตอยู่ใต้เคอร์เซอร์และอยู่ในระยะ; เป้าหมายว่าง, ฝ่ายเดียวกัน หรือนอกระยะต้อง Reject ก่อนหักทรัพยากร | ไม่ร่าย ไม่เสีย Mana และไม่เริ่ม Cooldown |
+| `SKILLSHOT_LINE` | ต้องมีทิศทางเล็งที่ถูกต้อง; ไม่จำเป็นต้องล็อกเป้าหมาย | ยิงออกและใช้ Mana/Cooldown แม้ยิงพลาด |
+| `GROUND_TARGET_AOE` | จุดศูนย์กลางต้องอยู่ใน Arena Bounds; ไม่จำเป็นต้องมีศัตรูอยู่ในพื้นที่ตอนกด | วางพื้นที่และใช้ Mana/Cooldown แม้ไม่มีศัตรูโดน |
+| `SELF_CAST` | ผู้ร่ายต้องอยู่ในสถานะใช้สกิลได้ และเงื่อนไขภายในสกิลต้องพร้อม เช่น Grand Rewind ต้องมี snapshot | ใช้ Mana/Cooldownเมื่อ effect เริ่มทำงานสำเร็จเท่านั้น |
+
+สำหรับ Version 1.0.0 สกิลที่บังคับ `SINGLE_TARGET` คือ **Gravitor Q: Magnetic Pull** และ **Korvax E: Concussive Blast**; HUD Tooltip ต้องระบุ Target Type ของ Q/W/E/R และ Ability Feedback ต้องแจ้ง `target required`, `out of range` หรือ `invalid ground` โดยไม่ใช้ Mana/Cooldown เมื่อ Reject
 
 ### 6.6 Talent Tree System (ใหม่ — เติม Spec ที่ Section 7.2 อ้างถึงแต่ยังไม่มีรายละเอียด)
 
@@ -316,10 +327,11 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้ตั้งแต่ต้นเหมือนเดิม เพื่อให้ตอน Port มือถือใน 1.1.0 ไม่ต้องรื้อ Simulation Core เลย — เพิ่มแค่ "Touch Input Adapter" ตัวใหม่ที่แปลงเป็น `{moveVector, castIntent, aimVector}` แบบเดียวกับที่ PC Adapter ทำอยู่แล้ว
 
 ### 7.1 กล้อง
-- มุมกล้องคงที่ Top-down Isometric 50 องศา
-- ระยะ Zoom: 8-14 เมตรจากพื้น (scroll wheel)
+- มุมกล้องคงที่ Top-down Perspective: pitch 60 องศา, vertical FOV 46 องศา และ presentation yaw -45 องศา ทำให้แนว Blue → Red พาดจากซ้ายล่างไปขวาบนบนหน้าจอแบบ Inspire MOBA โดยพิกัดสนามและ Simulation Core ยังคงแกนเดิม
+- ระยะกล้องตามแนวแกนมองเริ่มต้น 24 เมตร และ Zoom ได้ 18-32 เมตร (scroll wheel) เพื่อให้เห็นพื้นที่ต่อสู้มากขึ้นโดยยังอ่านตัวละครกับเอฟเฟกต์ได้ชัด
 - กล้องมีสองสถานะ: FREE สำหรับ Edge Pan/เลื่อนดูแผนที่ และ LOCKED สำหรับ follow ตัวละครแบบ soft-lerp พร้อม look-ahead
 - กด Y หรือปุ่มสถานะบน HUD เพื่อสลับ FREE/LOCKED; กด Space สั้นเพื่อ Focus และกดค้างเพื่อ Lock ชั่วคราว
+- Edge Pan ต้องแปลงทิศจาก screen-space ผ่านแกนระนาบของกล้อง เพื่อให้เลื่อนตามขอบจอได้ตรงทิศหลังใช้ presentation yaw
 
 ### 7.2 PC Control Scheme (Scope จริงของ 1.0.0)
 - **เคลื่อนที่:** Right-click (Click-to-move) มาตรฐาน Inspire MOBA
@@ -340,7 +352,7 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 
 ### 7.3 Mobile Control Scheme (เลื่อนไป Version 1.1.0 — เก็บ Spec ไว้ล่วงหน้า)
 - **เคลื่อนที่:** Virtual Joystick มุมซ้ายล่าง
-- **สกิล:** ปุ่มสกิลมุมขวาล่าง — สกิลประเภท `SKILLSHOT_LINE`/`GROUND_TARGET_AOE` ใช้ drag-to-aim, สกิลประเภท `SELF_CAST`/`SINGLE_TARGET` แตะครั้งเดียวจบ (auto-target ศัตรูที่ใกล้ที่สุดในระยะ)
+- **สกิล:** ปุ่มสกิลมุมขวาล่าง — `SKILLSHOT_LINE`/`GROUND_TARGET_AOE` ใช้ drag-to-aim, `SELF_CAST` แตะครั้งเดียวจบ และ `SINGLE_TARGET` ต้องแตะเลือกศัตรูที่มีชีวิตและอยู่ในระยะ; หากไม่มีเป้าหมายที่ถูกต้องต้อง Reject โดยไม่เสีย Mana/Cooldown ตาม Section 6.5.3
 
 ---
 
@@ -349,9 +361,10 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 - HP/Mana Bar เหนือหัวตัวละคร (World-space billboard ตามที่ระบุในเอกสารต้นฉบับ)
 - HP ศัตรูมองเห็นได้เฉพาะเมื่ออยู่ในระยะ Vision (ไม่เห็นตลอดเวลา — สอดคล้องกับกลไก Fog of War/Brush)
 - แถบ Ability พร้อม Cooldown radial-fill indicator
-- ตัวเลข Damage Popup ลอยขึ้นเมื่อโดนตี/โดนสกิล
+- ตัวเลข Damage Popup ลอยขึ้นเมื่อโดนตี/โดนสกิล โดยแสดงค่าดาเมจจริงหลังการลดทอนเพียงหนึ่งครั้งต่อ hit; Presentation ต้องซ่อน popup เมื่อผู้โจมตีและเป้าหมายเป็นครีปทั้งคู่ แต่ยังแสดงดาเมจที่ฮีโร่หรือสิ่งปลูกสร้างเป็นผู้โจมตี และดาเมจที่ฮีโร่/สิ่งปลูกสร้างได้รับ
 - แถบ Gold/Level/EXP มุมบนหน้าจอ
 - Kill Feed แบบเรียบง่าย (ข้อความ "You / Enemy destroyed [Tower]" หรือ "You / Enemy has been slain")
+- Kill Feed อยู่กึ่งกลางใต้ Top Bar, จำกัดไม่เกิน 3 รายการและต้องล้างข้อความหมดเมื่อครบเวลา เพื่อไม่ทับ Mini Map; Ability Feedback ไม่ถูกเพิ่มเข้ารายการนี้
 - Low-HP Vignette Warning เมื่อ HP ต่ำกว่า 25%
 - **Mini Map มุมซ้ายบน:** แสดงขอบสนาม, เลน, Fountain, Tower, Nexus, ครีป และฮีโร่ โดยตำแหน่งศัตรูต้องเคารพกฎ Vision/Brush ตาม Section 3.1 และ Section 8
 - Mini Map ต้องมีปุ่มย่อ/ขยาย, คลิกซ้ายเพื่อเลื่อนกล้อง และคลิกขวาเพื่อส่งคำสั่งเดินไปยังตำแหน่งที่แปลงกลับเป็น world-space ภายใน Arena Bounds

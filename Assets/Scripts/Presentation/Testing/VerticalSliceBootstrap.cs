@@ -8,7 +8,6 @@ using KOA.Presentation.Arena;
 using KOA.Presentation.Input;
 using KOA.Presentation.UI;
 using KOA.Presentation.Views;
-using KOA.Data.Enums;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -253,6 +252,7 @@ namespace KOA.Presentation.Testing
             {
                 camCtrl = mainCam.gameObject.AddComponent<TopDownCameraController>();
             }
+            camCtrl.UseDefaultPresentationHeading();
             camCtrl.SetTarget(_playerHeroGo.transform);
 
             Debug.Log("[Bootstrap] Phase 3 Ready! Press [P] to toggle Shop, 1-6 for Items, Right-click to Move.");
@@ -294,8 +294,13 @@ namespace KOA.Presentation.Testing
             view.BindLogic(minion);
             view.SetHealthBar(hb);
 
-            minion.OnAttackExecuted += (targetPos) => DamagePopupManager.Instance?.ShowDamage(targetPos, minion.AttackDamage, DamageType.Physical);
-            minion.OnDamageTaken += (dmg, type) => DamagePopupManager.Instance?.ShowDamage(minionGo.transform.position, dmg, type);
+            minion.OnDamageTakenWithSource += (dmg, type, attackerId) =>
+            {
+                // Section 8: lane minion trades remain visually quiet. Hero and structure
+                // damage still displays the resolved amount after target mitigation.
+                if (!MinionEntity.IsMinionId(attackerId))
+                    DamagePopupManager.Instance?.ShowDamage(minionGo.transform.position, dmg, type);
+            };
         }
 
         private void SpawnPlayerHero(string heroName)
@@ -507,7 +512,6 @@ namespace KOA.Presentation.Testing
             view.BindLogic(tower);
             view.SetHealthBar(towerHb);
 
-            tower.OnAttackFired += (targetPos, dmg, isHeated) => DamagePopupManager.Instance?.ShowDamage(targetPos, dmg, DamageType.Physical);
             tower.OnDamageTaken += (dmg, type) => DamagePopupManager.Instance?.ShowDamage(towerGo.transform.position, dmg, type);
         }
 

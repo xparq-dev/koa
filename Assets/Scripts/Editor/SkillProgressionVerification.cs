@@ -279,6 +279,35 @@ namespace KOA.Editor
                 Assert(casts == 16, $"Expected 16 successful ability casts, got {casts}");
             });
 
+            RunTest("Target Validation Does Not Consume Resources (Section 6.5.3)", ref passed, ref total, () =>
+            {
+                var gravitor = new GravitorHero(Vector3.zero) { TeamId = 0 };
+                Assert(gravitor.TryLevelSkill1(), "Gravitor Q should level");
+                float gravitorMana = gravitor.CurrentMana;
+                Assert(!gravitor.TryCastMagneticPull(Vector3.forward * 3f), "Gravitor Q must reject an empty target");
+                Assert(Mathf.Approximately(gravitor.CurrentMana, gravitorMana), "Rejected Gravitor Q must not consume Mana");
+                Assert(Mathf.Approximately(gravitor.Skill1CooldownRemaining, 0f), "Rejected Gravitor Q must not start cooldown");
+
+                var distantEnemy = new VorkasHero(Vector3.forward * 20f) { TeamId = 1 };
+                Assert(!gravitor.TryCastMagneticPull(distantEnemy.Position, distantEnemy), "Gravitor Q must reject an out-of-range target");
+                Assert(Mathf.Approximately(gravitor.CurrentMana, gravitorMana), "Out-of-range Gravitor Q must not consume Mana");
+                Assert(Mathf.Approximately(gravitor.Skill1CooldownRemaining, 0f), "Out-of-range Gravitor Q must not start cooldown");
+
+                var korvax = new KorvaxHero(Vector3.zero) { TeamId = 0 };
+                Assert(korvax.TryLevelSkill3(), "Korvax E should level");
+                float korvaxMana = korvax.CurrentMana;
+                Assert(!korvax.TryCastConcussiveBlast(Vector3.forward * 3f), "Korvax E must reject an empty target");
+                Assert(Mathf.Approximately(korvax.CurrentMana, korvaxMana), "Rejected Korvax E must not consume Mana");
+                Assert(Mathf.Approximately(korvax.Skill3CooldownRemaining, 0f), "Rejected Korvax E must not start cooldown");
+
+                var zenthis = new ZenthisHero(Vector3.zero) { TeamId = 0 };
+                Assert(zenthis.TryLevelSkill1(), "Zenthis Q should level");
+                float zenthisMana = zenthis.CurrentMana;
+                Assert(!zenthis.TryCastSacredHourglass(new Vector3(500f, 0f, 500f)), "Ground-target Q must reject a point outside the arena");
+                Assert(Mathf.Approximately(zenthis.CurrentMana, zenthisMana), "Invalid ground target must not consume Mana");
+                Assert(Mathf.Approximately(zenthis.Skill1CooldownRemaining, 0f), "Invalid ground target must not start cooldown");
+            });
+
             RunTest("Ability Cooldown Recovery Allows Repeat Cast", ref passed, ref total, () =>
             {
                 string[] heroes = { "Vorkas", "Zenthis", "Korvax", "Gravitor" };

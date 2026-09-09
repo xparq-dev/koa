@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using KOA.Core.Entities;
 using KOA.Core.Vision;
 using KOA.Core.Input;
+using KOA.Core.World;
 using KOA.Data.Enums;
 using KOA.Presentation.Input;
 using KOA.Presentation.UI;
@@ -393,6 +394,46 @@ namespace KOA.Presentation.Views
             return best;
         }
 
+        private ITargetable FindEnemyTargetUnderCursor(Vector3 aimPosition)
+        {
+            ITargetable hoveredTarget = GetTargetFromCollider(inputAdapter.HoveredCollider);
+            if (IsValidEnemyTarget(hoveredTarget)) return hoveredTarget;
+
+            const float cursorAssistRadius = 0.45f;
+            ITargetable best = null;
+            float bestSqr = float.MaxValue;
+            foreach (ITargetable target in GetAllTargets(enemyOnly: true))
+            {
+                if (!IsValidEnemyTarget(target)) continue;
+
+                Vector3 delta = target.Position - aimPosition;
+                delta.y = 0f;
+                float allowedRadius = target.Radius + cursorAssistRadius;
+                float sqr = delta.sqrMagnitude;
+                if (sqr <= allowedRadius * allowedRadius && sqr < bestSqr)
+                {
+                    best = target;
+                    bestSqr = sqr;
+                }
+            }
+
+            return best;
+        }
+
+        private bool IsValidEnemyTarget(ITargetable target)
+        {
+            return target != null
+                && target.IsAlive
+                && (target.TeamId != Hero.TeamId || target.TeamId == -1);
+        }
+
+        private static bool IsWithinCastRange(HeroBase3D hero, ITargetable target, float range)
+        {
+            return hero != null
+                && target != null
+                && Vector3.Distance(hero.Position, target.Position) <= range + target.Radius;
+        }
+
         private void ProcessInput()
         {
             if (inputAdapter == null) return;
@@ -432,6 +473,7 @@ namespace KOA.Presentation.Views
             bool castAttempted = false;
             bool castSucceeded = false;
             int attemptedSkillIndex = -1;
+            string rejectionReason = null;
             switch (input.CastIntent)
             {
                 case CastIntent.CastAttack:
@@ -448,9 +490,23 @@ namespace KOA.Presentation.Views
                     attemptedSkillIndex = 0;
                     var enemiesS1 = GetAllTargets(enemyOnly: true);
                     if (Hero is VorkasHero v1) castSucceeded = v1.TryCastIronCleave(input.AimVector, enemiesS1);
-                    else if (Hero is ZenthisHero z1) castSucceeded = z1.TryCastSacredHourglass(input.AimVector, FindTargetNear(input.AimVector, 6.0f, enemyOnly: true));
+                    else if (Hero is ZenthisHero z1)
+                    {
+                        if (!ArenaBounds.Contains(input.AimVector)) rejectionReason = "Q requires a ground point inside the arena";
+                        else castSucceeded = z1.TryCastSacredHourglass(input.AimVector, FindTargetNear(input.AimVector, ZenthisHero.Skill1Radius, enemyOnly: true));
+                    }
                     else if (Hero is KorvaxHero k1) castSucceeded = k1.TryCastHeavyBolt(input.AimVector, FindTargetNear(input.AimVector, 10.0f, enemyOnly: true));
-                    else if (Hero is GravitorHero g1) castSucceeded = g1.TryCastMagneticPull(input.AimVector, FindTargetNear(input.AimVector, 8.0f, enemyOnly: true));
+                    else if (Hero is GravitorHero g1)
+                    {
+                        ITargetable target = FindEnemyTargetUnderCursor(input.AimVector);
+                        if (target == null) rejectionReason = "Q requires an enemy target under the cursor";
+                        else
+                        {
+                            SetSelectedTarget(target);
+                            if (!IsWithinCastRange(Hero, target, GravitorHero.Skill1Range)) rejectionReason = "Q target is out of range";
+                            else castSucceeded = g1.TryCastMagneticPull(input.AimVector, target);
+                        }
+                    }
                     break;
 
                 case CastIntent.CastSkill2:
@@ -472,23 +528,45 @@ namespace KOA.Presentation.Views
                     var enemiesS3 = GetAllTargets(enemyOnly: true);
                     if (Hero is VorkasHero v3) castSucceeded = v3.TryCastSeismicSlam(input.AimVector, enemiesS3);
                     else if (Hero is ZenthisHero z3) castSucceeded = z3.TryCastTemporalRift(input.AimVector, enemiesS3);
-                    else if (Hero is KorvaxHero k3) castSucceeded = k3.TryCastConcussiveBlast(input.AimVector, FindTargetNear(input.AimVector, 5.0f, enemyOnly: true));
-                    else if (Hero is GravitorHero g3) castSucceeded = g3.TryCastGravitonWell(input.AimVector, enemiesS3);
+                    else if (Hero is KorvaxHero k3)
+                    {
+                        ITargetable target = FindEnemyTargetUnderCursor(input.AimVector);
+                        if (target == null) rejectionReason = "E requires an enemy target under the cursor";
+                        else
+                        {
+                            SetSelectedTarget(target);
+                            if (!IsWithinCastRange(Hero, target, KorvaxHero.Skill3Range)) rejectionReason = "E target is out of range";
+                            else castSucceeded = k3.TryCastConcussiveBlast(input.AimVector, target);
+                        }
+                    }
+                    else if (Hero is GravitorHero g3)
+                    {
+                        if (!ArenaBounds.Contains(input.AimVector)) rejectionReason = "E requires a ground point inside the arena";
+                        else castSucceeded = g3.TryCastGravitonWell(input.AimVector, enemiesS3);
+                    }
                     break;
 
                 case CastIntent.CastUltimate:
                     castAttempted = true;
                     attemptedSkillIndex = 3;
                     var enemiesUlt = GetAllTargets(enemyOnly: true);
-                    if (Hero is VorkasHero v4) castSucceeded = v4.TryCastRebellionImpact(input.AimVector, enemiesUlt);
+                    if (Hero is VorkasHero v4)
+                    {
+                        if (!ArenaBounds.Contains(input.AimVector)) rejectionReason = "R requires a ground point inside the arena";
+                        else castSucceeded = v4.TryCastRebellionImpact(input.AimVector, enemiesUlt);
+                    }
                     else if (Hero is ZenthisHero z4) castSucceeded = z4.TryCastGrandRewind();
                     else if (Hero is KorvaxHero k4) castSucceeded = k4.TryCastBallistaOverdrive(input.AimVector, FindTargetNear(input.AimVector, 18.0f, enemyOnly: true));
-                    else if (Hero is GravitorHero g4) castSucceeded = g4.TryCastGravityCollapse(input.AimVector, FindTargetNear(input.AimVector, 10.0f, enemyOnly: true));
+                    else if (Hero is GravitorHero g4)
+                    {
+                        if (!ArenaBounds.Contains(input.AimVector)) rejectionReason = "R requires a ground point inside the arena";
+                        else castSucceeded = g4.TryCastGravityCollapse(input.AimVector, FindTargetNear(input.AimVector, GravitorHero.UltimateRadius, enemyOnly: true));
+                    }
                     break;
             }
 
             if (castAttempted && !castSucceeded)
-                MatchHUD.NotifyAbilityRejected(Hero, attemptedSkillIndex);
+                MatchHUD.NotifyAbilityRejected(Hero, attemptedSkillIndex, rejectionReason);
 
             // 4. ระบบติดตามและเข้าตีเป้าหมายอัตโนมัติ (MOBA Auto-Attack / Walk-in-range)
             // คุมระยะหยุดให้หยุดที่ขอบระยะโจมตี ไม่เดินเข้าไปชนหรือทะลุเข้ากลางตัว Collider

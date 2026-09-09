@@ -1,4 +1,5 @@
 using KOA.Core.Minions;
+using KOA.Core.World;
 using KOA.Data.Enums;
 using System;
 using System.Collections.Generic;
@@ -123,26 +124,28 @@ namespace KOA.Core.Entities
         public bool TryCastMagneticPull(Vector3 aimWorldPos, ITargetable target = null)
         {
             if (!IsAlive || Skill1Rank <= 0 || Skill1CooldownRemaining > 0f) return false;
+            if (target == null || !target.IsAlive) return false;
+            if (target.TeamId == TeamId && target.TeamId != -1) return false;
+
+            float targetDistance = Vector3.Distance(Position, target.Position);
+            if (targetDistance > Skill1Range + target.Radius) return false;
             if (!TryConsumeMana(Skill1ManaCost)) return false;
 
             Skill1CooldownRemaining = ApplyAbilityCooldownReduction(Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 1.0f));
 
-            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
-            {
-                float dist = Vector3.Distance(Position, target.Position);
-                if (dist <= Skill1Range)
-                {
-                    // ดึงเป้าหมายมาอยู่ตรงหน้า Gravitor (ระยะ 1.8m)
-                    Vector3 pullDest = Position + (Rotation * Vector3.forward * 1.8f);
-                    if (target is DummyTarget dt) dt.Position = pullDest;
-                    else if (target is MinionEntity me) me.Position = pullDest;
-                    else if (target is HeroBase3D hb) hb.TryDisplace(pullDest);
+            // ดึงเป้าหมายมาอยู่ตรงหน้า Gravitor (ระยะ 1.8m)
+            Vector3 pullDirection = target.Position - Position;
+            pullDirection.y = 0f;
+            if (pullDirection.sqrMagnitude > 0.001f)
+                Rotation = Quaternion.LookRotation(pullDirection.normalized);
+            Vector3 pullDest = Position + (Rotation * Vector3.forward * 1.8f);
+            if (target is DummyTarget dt) dt.Position = pullDest;
+            else if (target is MinionEntity me) me.Position = pullDest;
+            else if (target is HeroBase3D hb) hb.TryDisplace(pullDest);
 
-                    float baseDmg = 70f + (Skill1Rank - 1) * 40f;
-                    float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
-                    target.TakeDamage(damage, DamageType.Magic, HeroId);
-                }
-            }
+            float baseDmg = 70f + (Skill1Rank - 1) * 40f;
+            float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
+            target.TakeDamage(damage, DamageType.Magic, HeroId);
 
             OnMagneticPullCast?.Invoke(aimWorldPos);
             return true;
@@ -191,6 +194,7 @@ namespace KOA.Core.Entities
         public bool TryCastGravitonWell(Vector3 groundPos, System.Collections.Generic.IEnumerable<ITargetable> targets = null)
         {
             if (!IsAlive || Skill3Rank <= 0 || Skill3CooldownRemaining > 0f) return false;
+            if (!ArenaBounds.Contains(groundPos)) return false;
             if (!TryConsumeMana(Skill3ManaCost)) return false;
 
             float cd = Mathf.Max(6.0f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f);
@@ -248,6 +252,7 @@ namespace KOA.Core.Entities
         public bool TryCastGravityCollapse(Vector3 groundPos, ITargetable target = null)
         {
             if (!IsAlive || UltimateRank <= 0 || UltimateCooldownRemaining > 0f) return false;
+            if (!ArenaBounds.Contains(groundPos)) return false;
             if (!TryConsumeMana(UltimateManaCost)) return false;
 
             UltimateCooldownRemaining = ApplyAbilityCooldownReduction(120f - (UltimateRank * 15f));

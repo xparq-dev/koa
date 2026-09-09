@@ -97,8 +97,8 @@ Scope ของเกมขยายขึ้นจริงจากที่�
 | 38-39 | **Talent Tree System** (Section 6.6) — UI เลือก A/B ที่ Level 4/8/12, เชื่อมกับปุ่ม `T` |
 | 40 | **Attribute Bonus System** (Section 6.7) — UI ลงแต้ม 4 หมวด, เชื่อมกับปุ่ม `Ctrl+U` |
 | 41 | FSM Bot Easy Tier + Hard Tier (Hard ใช้ Prediction Algorithm ให้ AI ช่วยเขียนสมการเวกเตอร์) |
-| 42 | UI/HUD และ Control Polish (Section 7-8): Kill Feed, Cooldown/NO MANA state, Skill Tooltip, F1 Hero Profile, Mini Map interaction/expand, HUD input shield, Camera FREE/LOCKED และแผง Control แบบย่อได้ |
-| 43 | Combat Readability & Balance Pass รอบแรก: ทดสอบทุกคู่ matchup (4x4), textured VFX/SFX ของฮีโร่-ป้อม-ครีป, Animation timing, movement pace และปรับค่าตัวเลขที่ไม่สมดุล |
+| 42 | UI/HUD และ Control Polish (Section 7-8): Kill Feed แยกจาก Ability Feedback ที่ไม่ทับ Mini Map, Cooldown/NO MANA state, Skill Tooltip, F1 Hero Profile, Mini Map interaction/expand, HUD input shield, Camera FREE/LOCKED, มุมเลนพาดเฉียงบนหน้าจอ และแผง Control แบบย่อได้ |
+| 43 | Combat Readability & Balance Pass รอบแรก: ทดสอบทุกคู่ matchup (4x4), Target Validation/Resource Commitment ของ Single Target-Skillshot-Ground-Self Cast, textured VFX/SFX ของฮีโร่-ป้อม-ครีป, กรอง Damage Popup ของครีปที่ตีกันเองและป้องกันเลขซ้ำ, Animation timing, movement pace และปรับค่าตัวเลขที่ไม่สมดุล |
 
 **Exit Criteria:** เล่นได้ครบ 4 ฮีโร่ x 3 ระดับความยาก Bot, Shop/Talent/Attribute ใช้งานได้จริงครบ
 

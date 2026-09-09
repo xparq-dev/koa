@@ -22,7 +22,7 @@
 | Quaternius — Stylized Nature MegaKit Standard | CC0 1.0 | FBX (Unity) ชุดฟรี 68 โมเดลและ texture | พุ่มไม้ ต้นไม้ สน และก้อนหินในสนาม Demo |
 | Quaternius — Medieval Village MegaKit Standard | CC0 1.0 | Uneven Brick, Rock Trim และ Terrain Noise texture ความละเอียดสูง | พื้นสะพานหิน หน้าผาและวัสดุขอบเหว |
 | Quaternius — ชุดโครงสร้างจากโฟลเดอร์ Ultimate Fantasy RTS | CC0 1.0 ตาม `License.txt` ที่แนบ | WatchTower, Temple, Wonder และ WallTower รวม 8 FBX | Outer Tower, Inner Tower, Nexus และ Fountain |
-| Kenney — Fantasy UI Borders | CC0 1.0 | ใช้ `Double/Border/panel-border-000.png` จากชุด PNG | กรอบหลักของ Mini Map, Top Bar, Hero Panel, Action Console, Control Panel และ Shop; เก็บไฟล์ runtime ที่ `Assets/Resources/KOA/UI/panel-frame-double.png` |
+| Kenney — Fantasy UI Borders | CC0 1.0 | ทดลอง `Double/Border/panel-border-000.png` จากชุด PNG | เก็บไว้เป็นต้นแบบเท่านั้น; ปิดจาก HUD ระหว่างเล่นหลัง visual QA พบว่ามุมขาวขนาด 64x64 ถูกยืดและรบกวนข้อความ ปัจจุบันใช้กรอบบางสีเข้มแบบ resolution-independent |
 | Kenney — Input Prompts 1.5A | CC0 1.0 | Prompt ที่ใช้กับปุ่มควบคุม KOA 18 ภาพ | เตรียมไว้สำหรับหน้าคู่มือ/คำใบ้ปุ่ม; ยังไม่ผูก runtime |
 | Kenney — Particle Pack 1.1 | CC0 1.0 | 14 PNG แบบ transparent ที่คัดใช้จาก 80 ภาพ | Slash, projectile, impact, magic glyph, aura, flame, dirt, smoke และ gravity vortex ของฮีโร่ ป้อม และครีป |
 | Kenney — RPG Audio | CC0 1.0 | 7 OGG จากชุด 50 เสียง | เสียงฟัน กระแทก กลไก และฝีเท้า; ผูกกับจังหวะ combat/locomotion |
@@ -71,7 +71,7 @@
 - แก้ตัวสร้าง prefab ให้ใช้ `Visual` wrapper เก็บสเกล FBX อย่างแน่นอน; ก่อนแก้ Tower renderer สูงเพียงประมาณ 0.04 เมตรแม้ collider ถูกต้อง
 - ปรับสัดส่วน Demo visual ของ Outer Tower / Inner Tower / Nexus เป็น 3.6 / 4.3 / 5.4 เมตร ลดฐานวงกลมและ beacon พร้อมจัด health bar ให้สัมพันธ์กับความสูงใหม่
 - หัน facade ของโครงสร้างเข้าหามุมกล้องมาตรฐาน เพราะโมเดลฟรีชุดที่เลือกมีด้านหลังเปิดและมืดกว่าด้านหน้า
-- ตั้งระยะกล้องเริ่มต้นเป็น 13.5 เมตรภายในช่วง 8-14 เมตรตาม Requirement Section 7.1 เพื่อเห็นขอบสะพานและหุบเหวได้กว้างขึ้น
+- ตั้งกล้อง pitch 60 องศา, vertical FOV 46 องศา และระยะเริ่มต้น 24 เมตรภายในช่วง 18-32 เมตรตาม Requirement Section 7.1 เพื่อเห็นพื้นที่ต่อสู้ ขอบสะพาน และหุบเหวได้กว้างขึ้น
 - Runtime โหลด prefab จาก `Resources/KOA/Demo` และย้อนกลับไปใช้ primitive เดิมได้หาก Asset ใดหาย
 - ไม่ได้นำ third-party script, sample scene หรือ ProjectSettings จากแพ็กเข้ามา
 
@@ -97,6 +97,6 @@
 
 1. เก็บ ZIP ต้นฉบับและไฟล์ License ไว้เป็นหลักฐานแหล่งที่มา
 2. เปลี่ยน demo hero identity เป็นโมเดล/portrait/VFX ที่ออกแบบเฉพาะ Project KOA ก่อน final art lock
-3. ตรวจความชัดของกรอบ UI และปรับระดับเสียง VFX/UI จากของที่ integrate แล้วบนความละเอียดจอเป้าหมายใน Phase 4
+3. คัดกรอบ UI ที่รองรับ nine-slice และปรับระดับเสียง VFX/UI บนความละเอียดจอเป้าหมายใน Phase 4; ห้ามเปิดกรอบภาพกับ HUD หลักก่อนผ่าน visual QA
 4. ตรวจ draw calls, texture memory, animation และ frame time ด้วย Unity Profiler บนเครื่องเป้าหมายตาม Roadmap Week 45
 5. ทำ visual/playability review ใน Game View จริงก่อน Owner sign-off; automated import/compile ไม่สามารถยืนยันความสวยงามหรือ gameplay feel แทนคนได้

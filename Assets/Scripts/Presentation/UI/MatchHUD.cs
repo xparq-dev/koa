@@ -51,6 +51,8 @@ namespace KOA.Presentation.UI
         private int _selectedShopCategory = 0;
         private int _hoveredSkillIndex = -1;
         private float _nextAbilityRejectMessageAt;
+        private string _abilityFeedbackMessage = string.Empty;
+        private float _abilityFeedbackExpiresAt;
         private readonly List<string> _killFeed = new List<string>();
         private float _killFeedTimer = 0f;
 
@@ -69,9 +71,9 @@ namespace KOA.Presentation.UI
         private GUIStyle _centerLabel;
         private GUIStyle _bigLabel;
         private GUIStyle _hintLabel;
+        private GUIStyle _abilityFeedbackStyle;
         private GUIStyle _solidBoxStyle;
         private GUIStyle _panelFrameStyle;
-        private Texture2D _panelFrameTexture;
         private AudioSource _uiAudioSource;
         private HeroPortraitPreview _portraitPreview;
         private KOA.Presentation.Camera.TopDownCameraController _cameraController;
@@ -161,11 +163,17 @@ namespace KOA.Presentation.UI
         public void AddKillFeed(string message)
         {
             _killFeed.Add(message);
-            if (_killFeed.Count > 5) _killFeed.RemoveAt(0);
+            if (_killFeed.Count > 3) _killFeed.RemoveAt(0);
             _killFeedTimer = 5.0f;
         }
 
-        public static void NotifyAbilityRejected(HeroBase3D hero, int skillIndex)
+        private void ShowAbilityFeedback(string message)
+        {
+            _abilityFeedbackMessage = message;
+            _abilityFeedbackExpiresAt = Time.unscaledTime + 1.6f;
+        }
+
+        public static void NotifyAbilityRejected(HeroBase3D hero, int skillIndex, string targetingReason = null)
         {
             if (_activeHud == null || hero == null || skillIndex < 0 || skillIndex > 3) return;
             if (Time.unscaledTime < _activeHud._nextAbilityRejectMessageAt) return;
@@ -182,10 +190,12 @@ namespace KOA.Presentation.UI
                 message = $"{keys[skillIndex]} cooldown: {cooldowns[skillIndex]:F1}s";
             else if (hero.CurrentMana + 0.001f < costs[skillIndex])
                 message = $"Not enough mana — {keys[skillIndex]} needs {costs[skillIndex]:F0} MP";
+            else if (!string.IsNullOrEmpty(targetingReason))
+                message = targetingReason;
             else
                 message = $"{keys[skillIndex]} cannot be cast in the current state";
 
-            _activeHud.AddKillFeed(message);
+            _activeHud.ShowAbilityFeedback(message);
             _activeHud.PlayUiSound("error_004", 0.55f);
         }
 
@@ -223,24 +233,29 @@ namespace KOA.Presentation.UI
             };
             _hintLabel.normal.textColor = new Color(0.7f, 0.7f, 0.7f);
 
+            _abilityFeedbackStyle = new GUIStyle(_centerLabel)
+            {
+                fontSize = 13,
+                fontStyle = FontStyle.Bold
+            };
+
             // Reuse one engine-owned texture for all solid bars. Creating Texture2D in OnGUI
             // exhausts Unity graphics resource IDs after only a few minutes of play.
             _solidBoxStyle = new GUIStyle(GUI.skin.box);
             _solidBoxStyle.normal.background = Texture2D.whiteTexture;
 
-            _panelFrameTexture = Resources.Load<Texture2D>("KOA/UI/panel-frame-double");
-            _panelFrameStyle = new GUIStyle(GUI.skin.box);
-            if (_panelFrameTexture != null)
-            {
-                _panelFrameStyle.normal.background = _panelFrameTexture;
-                _panelFrameStyle.border = new RectOffset(14, 14, 14, 14);
-                _panelFrameStyle.padding = new RectOffset(12, 12, 12, 12);
-            }
-
-            _vignetteTexture = CreateVignetteTex(256, 256);
-            _overlayDarkTex = MakeTex(1, 1, new Color(0f, 0f, 0f, 0.75f));
+            _overlayDarkTex = MakeTex(1, 1, new Color(0.015f, 0.022f, 0.028f, 0.88f));
             _redTex = MakeTex(1, 1, new Color(0.85f, 0.05f, 0.05f));
             _goldTex = MakeTex(1, 1, new Color(0.95f, 0.78f, 0.1f));
+
+            // Keep in-match HUD framing quiet and resolution independent. Decorative
+            // source textures are reserved for large modal layouts after nine-slice QA.
+            _panelFrameStyle = new GUIStyle(GUI.skin.box);
+            _panelFrameStyle.normal.background = _overlayDarkTex;
+            _panelFrameStyle.border = new RectOffset(0, 0, 0, 0);
+            _panelFrameStyle.padding = new RectOffset(8, 8, 7, 7);
+
+            _vignetteTexture = CreateVignetteTex(256, 256);
         }
 
         private static Texture2D MakeTex(int w, int h, Color col)
@@ -276,7 +291,7 @@ namespace KOA.Presentation.UI
             if (_killFeedTimer > 0f)
             {
                 _killFeedTimer -= Time.deltaTime;
-                if (_killFeedTimer <= 0f && _killFeed.Count > 0) _killFeed.RemoveAt(0);
+                if (_killFeedTimer <= 0f) _killFeed.Clear();
             }
 
             // Respawn countdown
@@ -411,6 +426,7 @@ namespace KOA.Presentation.UI
             DrawMiniMap();
             DrawHeroBottomPanel();
             DrawSkillBar();
+            DrawAbilityFeedback();
             DrawControlPanel();
             DrawKillFeed();
 
@@ -437,6 +453,11 @@ namespace KOA.Presentation.UI
         private void DrawPanelFrame(Rect rect, string title = "")
         {
             GUI.Box(rect, title, _panelFrameStyle ?? GUI.skin.box);
+            Color edge = new Color(0.28f, 0.40f, 0.46f, 0.78f);
+            DrawSolidRect(new Rect(rect.x, rect.y, rect.width, 1f), edge);
+            DrawSolidRect(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), edge);
+            DrawSolidRect(new Rect(rect.x, rect.y, 1f, rect.height), edge);
+            DrawSolidRect(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), edge);
         }
 
         // ══════════════════════════════════════════════════════════
@@ -1135,12 +1156,13 @@ namespace KOA.Presentation.UI
         {
             string[] names = GetSkillNames(CurrentPlayerHero);
             string[] descriptions = GetSkillDescriptions(CurrentPlayerHero);
+            string[] targetingHints = GetSkillTargetingHints(CurrentPlayerHero);
             float[] manaCosts = GetHeroManaCosts(CurrentPlayerHero);
             float[] cooldowns = GetHeroMaxCooldowns(CurrentPlayerHero);
             string[] keys = { "Q", "W", "E", "R", "A" };
 
             const float width = 390f;
-            const float height = 112f;
+            const float height = 130f;
             float x = Mathf.Clamp(Event.current.mousePosition.x - width * 0.5f, 8f, Screen.width - width - 8f);
             float y = Mathf.Max(62f, skillBarY - height - 12f);
             Rect rect = new Rect(x, y, width, height);
@@ -1154,9 +1176,12 @@ namespace KOA.Presentation.UI
                 ? $"Mana {manaCosts[skillIndex]:F0}   •   Base cooldown {cooldowns[skillIndex]:F0}s"
                 : "Basic attack — no mana cost";
             GUI.Label(new Rect(x + 12f, y + 30f, width - 24f, 18f), resource, _hintLabel);
+            var targetingStyle = new GUIStyle(_hintLabel) { alignment = TextAnchor.MiddleLeft };
+            targetingStyle.normal.textColor = new Color(0.95f, 0.74f, 0.28f);
+            GUI.Label(new Rect(x + 12f, y + 49f, width - 24f, 18f), targetingHints[skillIndex], targetingStyle);
             var body = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true };
             body.normal.textColor = new Color(0.88f, 0.91f, 0.96f);
-            GUI.Label(new Rect(x + 12f, y + 50f, width - 24f, 54f), descriptions[skillIndex], body);
+            GUI.Label(new Rect(x + 12f, y + 69f, width - 24f, 54f), descriptions[skillIndex], body);
         }
 
         private void DrawTalentTreeModal()
@@ -1342,6 +1367,7 @@ namespace KOA.Presentation.UI
 
             string[] names = GetSkillNames(CurrentPlayerHero);
             string[] descriptions = GetSkillDescriptions(CurrentPlayerHero);
+            string[] targetingHints = GetSkillTargetingHints(CurrentPlayerHero);
             float[] costs = GetHeroManaCosts(CurrentPlayerHero);
             float[] cooldowns = GetHeroMaxCooldowns(CurrentPlayerHero);
             string[] keys = { "Q", "W", "E", "R" };
@@ -1360,9 +1386,12 @@ namespace KOA.Presentation.UI
                 abilityTitle.normal.textColor = GetSkillColor(i);
                 GUI.Label(new Rect(row.x + 54, row.y + 5, row.width - 64, 20), names[i], abilityTitle);
                 GUI.Label(new Rect(row.x + 54, row.y + 24, row.width - 64, 17), $"Mana {costs[i]:F0}  •  Base cooldown {cooldowns[i]:F0}s", _hintLabel);
+                var targetHint = new GUIStyle(_hintLabel) { alignment = TextAnchor.MiddleLeft, fontSize = 9 };
+                targetHint.normal.textColor = new Color(0.95f, 0.74f, 0.28f);
+                GUI.Label(new Rect(row.x + 54, row.y + 41, row.width - 64, 16), targetingHints[i], targetHint);
                 var abilityBody = new GUIStyle(GUI.skin.label) { fontSize = 10, wordWrap = true };
                 abilityBody.normal.textColor = new Color(0.86f, 0.89f, 0.94f);
-                GUI.Label(new Rect(row.x + 54, row.y + 42, row.width - 64, row.height - 46), descriptions[i], abilityBody);
+                GUI.Label(new Rect(row.x + 54, row.y + 57, row.width - 64, row.height - 61), descriptions[i], abilityBody);
             }
 
             GUI.Label(new Rect(mx + modalW - 210, my + 44, 180, 20), "Press [F1] to close", _hintLabel);
@@ -1402,6 +1431,50 @@ namespace KOA.Presentation.UI
             if (hero is KorvaxHero) return new[] { "Heavy Bolt", "Focus", "Concussive", "Ballista", "Auto Atk" };
             if (hero is GravitorHero) return new[] { "Mag.Pull", "Repulsion", "Grav.Well", "Collapse", "Auto Atk" };
             return new[] { "Skill 1", "Skill 2", "Skill 3", "Ultimate", "Attack" };
+        }
+
+        private static string[] GetSkillTargetingHints(HeroBase3D hero)
+        {
+            if (hero is VorkasHero) return new[]
+            {
+                "DIRECTION SKILLSHOT — can miss",
+                "SELF CAST — no target required",
+                "SELF-CENTERED AREA — can miss",
+                "GROUND AREA — arena ground required; can miss",
+                "ENEMY TARGET — right-click or press A near a target"
+            };
+            if (hero is ZenthisHero) return new[]
+            {
+                "GROUND AREA — arena ground required; can miss",
+                "SELF CAST — no target required",
+                "DIRECTION SKILLSHOT — can miss",
+                "SELF CAST — requires a recorded rewind state",
+                "ENEMY TARGET — right-click or press A near a target"
+            };
+            if (hero is KorvaxHero) return new[]
+            {
+                "DIRECTION SKILLSHOT — can miss",
+                "SELF CAST — no target required",
+                "ENEMY TARGET REQUIRED — place cursor on target",
+                "DIRECTION SKILLSHOT — can miss",
+                "ENEMY TARGET — right-click or press A near a target"
+            };
+            if (hero is GravitorHero) return new[]
+            {
+                "ENEMY TARGET REQUIRED — place cursor on target",
+                "SELF-CENTERED AREA — can miss",
+                "GROUND AREA — arena ground required; can miss",
+                "GROUND AREA — arena ground required; can miss",
+                "ENEMY TARGET — right-click or press A near a target"
+            };
+            return new[]
+            {
+                "Targeting unavailable",
+                "Targeting unavailable",
+                "Targeting unavailable",
+                "Targeting unavailable",
+                "ENEMY TARGET"
+            };
         }
 
         private static string[] GetSkillDescriptions(HeroBase3D hero)
@@ -1641,7 +1714,7 @@ namespace KOA.Presentation.UI
         private void DrawControlPanel()
         {
             int px = Screen.width - 240, py = 56;
-            int panelHeight = _isControlPanelExpanded ? 324 : 32;
+            int panelHeight = _isControlPanelExpanded ? 334 : 32;
             DrawPanelFrame(new Rect(px, py, 230, panelHeight), "⚙ Hero & Bot Controls");
             if (GUI.Button(new Rect(px + 198, py + 4, 26, 22), _isControlPanelExpanded ? "−" : "+"))
             {
@@ -1712,13 +1785,48 @@ namespace KOA.Presentation.UI
         }
 
         // ══════════════════════════════════════════════════════════
+        //  ABILITY FEEDBACK
+        // ══════════════════════════════════════════════════════════
+        private void DrawAbilityFeedback()
+        {
+            float remaining = _abilityFeedbackExpiresAt - Time.unscaledTime;
+            if (remaining <= 0f || string.IsNullOrEmpty(_abilityFeedbackMessage)) return;
+
+            float fade = Mathf.Clamp01(remaining / 0.25f);
+            Rect panel = GetTopCenterNotificationRect(360f, 27f, 56f);
+
+            DrawSolidRect(panel, new Color(0.04f, 0.055f, 0.07f, 0.88f * fade));
+            DrawSolidRect(new Rect(panel.x, panel.yMax - 2f, panel.width, 2f), new Color(0.95f, 0.66f, 0.12f, 0.95f * fade));
+
+            _abilityFeedbackStyle.normal.textColor = new Color(1f, 0.83f, 0.38f, fade);
+            GUI.Label(panel, _abilityFeedbackMessage, _abilityFeedbackStyle);
+        }
+
+        // ══════════════════════════════════════════════════════════
         //  KILL FEED
         // ══════════════════════════════════════════════════════════
         private void DrawKillFeed()
         {
-            int sy = 56;
+            float sy = Time.unscaledTime < _abilityFeedbackExpiresAt ? 87f : 56f;
+            Rect firstRow = GetTopCenterNotificationRect(340f, 24f, sy);
             for (int i = 0; i < _killFeed.Count; i++)
-                GUI.Box(new Rect(10, sy + (i * 26), 340, 24), $"📢 {_killFeed[i]}");
+                GUI.Box(new Rect(firstRow.x, sy + (i * 26), firstRow.width, firstRow.height), $"📢 {_killFeed[i]}");
+        }
+
+        private Rect GetTopCenterNotificationRect(float preferredWidth, float height, float y)
+        {
+            float safeLeft = GetMiniMapPanelRect().xMax + 10f;
+            float safeRight = Screen.width - 250f;
+            float safeWidth = safeRight - safeLeft;
+
+            if (safeWidth >= 220f)
+            {
+                float width = Mathf.Min(preferredWidth, safeWidth);
+                return new Rect(safeLeft + (safeWidth - width) * 0.5f, y, width, height);
+            }
+
+            float fallbackWidth = Mathf.Min(preferredWidth, Mathf.Max(1f, Screen.width - 24f));
+            return new Rect((Screen.width - fallbackWidth) * 0.5f, y, fallbackWidth, height);
         }
 
         // ══════════════════════════════════════════════════════════

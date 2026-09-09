@@ -186,6 +186,11 @@ namespace KOA.Core.Entities
         public bool TryCastConcussiveBlast(Vector3 aimWorldPos, ITargetable target = null)
         {
             if (!IsAlive || Skill3Rank <= 0 || Skill3CooldownRemaining > 0f) return false;
+            if (target == null || !target.IsAlive) return false;
+            if (target.TeamId == TeamId && target.TeamId != -1) return false;
+
+            float targetDistance = Vector3.Distance(Position, target.Position);
+            if (targetDistance > Skill3Range + target.Radius) return false;
             if (!TryConsumeMana(Skill3ManaCost)) return false;
 
             float cd = Mathf.Max(6.5f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f);
@@ -198,32 +203,23 @@ namespace KOA.Core.Entities
 
             Rotation = Quaternion.LookRotation(blastDir);
 
-            bool hit = false;
-            if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
-            {
-                float dist = Vector3.Distance(Position, target.Position);
-                if (dist <= Skill3Range + target.Radius)
-                {
-                    hit = true;
-                    float baseDmg = 70f + (Skill3Rank - 1) * 40f;
-                    float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
-                    target.TakeDamage(damage, DamageType.Physical, HeroId);
+            float baseDmg = 70f + (Skill3Rank - 1) * 40f;
+            float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
+            target.TakeDamage(damage, DamageType.Physical, HeroId);
 
-                    // ผลักศัตรูถอยหลัง 3.5m (ยกเว้นป้อม)
-                    Vector3 pushDir = (target.Position - Position).normalized;
-                    if (target is HeroBase3D heroTarget)
-                    {
-                        if (heroTarget.TryDisplace(heroTarget.Position + pushDir * 3.5f))
-                            heroTarget.ApplyMovementSlow(0.40f, 2.0f);
-                    }
-                    else if (target is MinionEntity minionTarget)
-                    {
-                        minionTarget.Position += pushDir * 3.5f;
-                    }
-                }
+            // ผลักศัตรูถอยหลัง 3.5m (ยกเว้นป้อม)
+            Vector3 pushDir = (target.Position - Position).normalized;
+            if (target is HeroBase3D heroTarget)
+            {
+                if (heroTarget.TryDisplace(heroTarget.Position + pushDir * 3.5f))
+                    heroTarget.ApplyMovementSlow(0.40f, 2.0f);
+            }
+            else if (target is MinionEntity minionTarget)
+            {
+                minionTarget.Position += pushDir * 3.5f;
             }
 
-            OnConcussiveBlastFired?.Invoke(Position, hit);
+            OnConcussiveBlastFired?.Invoke(Position, true);
             return true;
         }
 
