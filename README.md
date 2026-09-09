@@ -1,86 +1,167 @@
-# Project KOA (Kronos Origin Area) ⚔️
-### 1v1 Single-Lane Duel Arena MOBA (Unity 3D URP / C#)
+# Project KOA (Kronos Origin Area)
 
-[![Unity](https://img.shields.io/badge/Unity-2022.3%2B%20%7C%20URP-black.svg?style=flat&logo=unity)](https://unity.com/)
+### 1v1 Single-Lane Duel Arena — Unity 3D URP / C#
+
+[![Unity](https://img.shields.io/badge/Unity-6000.5.10f1%20%7C%20URP-black.svg?style=flat&logo=unity)](https://unity.com/)
 [![Architecture](https://img.shields.io/badge/Architecture-Decoupled%20Core-blue.svg)](docs/Project_KOA_1v1_Complete_Requirement_v1.0.0.md)
-[![Status](https://img.shields.io/badge/Roadmap-Phase%203%20Complete-success.svg)](docs/Project_KOA_Production_Roadmap.md)
+[![Status](https://img.shields.io/badge/Roadmap-Phase%203%20Owner%20Playtest-yellow.svg)](docs/Project_KOA_Production_Roadmap.md)
 
-**Project KOA** คือเกมแนว MOBA แบบ 1v1 บนแผนที่เลนเดี่ยว (Duel Arena) พัฒนาด้วย **Unity 3D (Universal Render Pipeline)** และภาษา C# โดยยึดหลักสถาปัตยกรรม **Decoupled Core Paradigm** แยกขาดระหว่าง Simulation Logic (รันที่ 30 Ticks/sec) ออกจาก Presentation/View Layer อย่างสิ้นเชิง
+Project KOA เป็นเกม MOBA แบบ 1v1 บนแผนที่เลนเดี่ยวสำหรับ PC พัฒนาด้วย Unity URP และ C# โดยแยก Simulation Core ที่ทำงาน 30 ticks/second ออกจาก Input และ Presentation Layer ตามสถาปัตยกรรม Decoupled Core ใน Requirement Section 1.1
 
----
+## สถานะปัจจุบัน
 
-## 🌟 ฟีเจอร์หลัก (Key Features)
+อัปเดตล่าสุด: **2026-09-09**
 
-### 1. 🧙 ฮีโร่ครบ 4 ตัว (4 Distinct Heroes)
-- **Vorkas (The Iron Vanguard):** Melee Juggernaut ถึกทน คุมสนามด้วยคลื่นดาบ *Iron Cleave*
-- **Zenthis (The Chrono Guardian):** Ranged Time Mage สตันหมู่ด้วย *Sacred Hourglass* และย้อนเวลาด้วย *Grand Rewind*
-- **Korvax (The Ballista Sniper):** Marksman ระยะไกล ยิงทะลวงเกราะด้วย *Heavy Bolt* และมหาศร *Ballista Overdrive*
-- **Gravitor (The Singularity):** Disrupter Tank ดึงศัตรูด้วย *Magnetic Pull* ผลักออกด้วย *Repulsion Zone* และดูดด้วยหลุมดำ *Gravity Kore Collapse*
+- Phase 0-2 มี implementation artifacts ของ Foundation, Core Loop, Bot, Arena, Economy, Tower และ Minion แล้ว
+- Phase 3 Week 28-43 มีฮีโร่ 4 ตัว, สกิล, Shop, Talent, Attribute, Bot 3 ระดับ และรอบ Combat/UI/Control Polish แล้ว
+- Unity batch import และ script compilation ผ่านโดยไม่มี C# error หรือ warning
+- Core verification ผ่าน **15/15** รวมการใช้ Q/W/E/R ซ้ำหลังคูลดาวน์, สกิลครบ 16 ท่า, matchup smoke matrix 4x4 และ simulation ต่อเนื่อง 20 นาที
+- Phase 3 ยังไม่ปิดจนกว่า Owner จะทดสอบใน Unity Engine และยอมรับด้านภาพ เสียง Animation และการควบคุม
+- ยังไม่มี Player Build จากรอบนี้ เจ้าของโปรเจกต์จะเป็นผู้ Run และ Build ผ่าน Unity Engine
+- Phase 4 ยังเหลือ Bug Bash, Performance Profiling, Acceptance Criteria 8 ข้อ และ Release Preparation
 
-### 2. 🏪 ระบบร้านค้า & ไอเทม (Shop & 8 Starting Items)
-- กระเป๋า 6 ช่อง (Inventory Slots)
-- ไอเทมสำเร็จรูป 8 ชนิดตาม Section 5.2 (เช่น Warblade Fang, Kinetic Boots, Gravity Anchor Capstone)
-- ไอเทมประเภทกดใช้ **Nullifying Cloak (Active)** ล้างสถานะ Debuff และกัน CC ชั่วคราว
+รายละเอียดสถานะและ Gate ที่เหลืออยู่ใน [Production Roadmap](docs/Project_KOA_Production_Roadmap.md) และ [Phase Status](docs/Project_KOA_Phase_Status_2026-09-08.md)
 
-### 3. 🤖 ระบบ Bot AI 3 ระดับความยาก (Multi-Tier AI)
-- **Easy:** เหมาะสำหรับผู้เริ่มต้น ตอบสนองช้า
-- **Medium:** ดันเลน โจมตีตามระยะ และถอยกลับบ้านเมื่อเลือดต่ำกว่า 30%
-- **Hard:** มี **Prediction Algorithm** คำนวณความเร็วเป้าหมายเพื่อยิงสกิลดักหน้า และออกคอมโบอย่างดุดัน
+## ฟีเจอร์ที่มีแล้ว
 
-### 4. 🏰 แผนที่เลนเดี่ยว, ป้อมปราการ และมินเนี่ยน (Map Structures & Minions)
-- ป้อมปราการ 2 Tier + Nexus Core
-- กลไก **Heating Laser** (ยิ่งยิงเป้าหมายเดิมดาเมจยิ่งเพิ่มขึ้น)
-- กลไก **Tower Plating** (เกราะหนาพิเศษใน 4 นาทีแรก)
-- ครีปเวฟ (2 Melee + 1 Ranged) เกิดทุก 25 วินาที พร้อมสูตร **Evolution Scaling** ทุกๆ 3 นาที
+### ฮีโร่และการต่อสู้
 
----
+- ฮีโร่ 4 ตัว: Vorkas, Zenthis, Korvax และ Gravitor
+- ฮีโร่แต่ละตัวมี Passive และ Q/W/E/R ตาม Requirement Section 6.1-6.4
+- Mana ฟื้นอัตโนมัตินอก Fountain และฟื้นเร็วขึ้นภายใน Fountain
+- HUD แยกสถานะ READY, COOLDOWN, NO MANA และ UNLEARNED/LOCKED
+- เมื่อร่ายไม่สำเร็จจะแสดงเหตุผลและมีเสียงตอบสนอง
+- เอฟเฟกต์ของฮีโร่ ป้อม และครีปใช้ textured particle, projectile, ground glyph และ impact
+- Idle, Walk, Attack, Cast และ Death แยกสถานะ โดยจังหวะโจมตี/ร่ายเริ่มจาก Core success event
+- Base movement pace ปรับตาม Requirement Section 6.5.2
 
-## 🕹️ การควบคุม (Controls)
+### แผนที่และ Core Loop
 
-| คำสั่ง | คีย์บอร์ด / เมาส์ (PC) |
+- Duel Arena ขนาดประมาณ 130 x 26 เมตร พร้อมขอบเขตบังคับ
+- Fountain, Outer Tower, Inner Tower และ Nexus ฝั่งละหนึ่งชุด
+- แผนที่สะพานสูงพร้อมสภาพแวดล้อมหน้าผา ป่า น้ำ และฉากระดับล่าง
+- ครีปพื้นฐาน 2 Melee + 1 Ranged เกิดทุก 25 วินาที
+- Cannon Minion และ Super Creep จาก Tower Escalation
+- Tower Heating, Tower Plating, Fountain regeneration และลำดับการทำลายโครงสร้าง
+- ระบบ Gold, EXP, Level, Respawn, Kill Feed และเงื่อนไขชนะ/แพ้
+
+### Bot, Shop และ Progression
+
+- Bot AI ระดับ Easy, Medium และ Hard
+- Shop ใช้ได้เฉพาะภายใน Fountain และมีไอเทมเริ่มต้น 8 รายการ
+- Shop แบ่ง All Items, Consumables, Attributes, Equipment, Miscellaneous และ Upgraded
+- Inventory 6 ช่องและ Active Item hotkeys 1-6
+- Talent แบบเลือก A/B ที่ Level 4, 8 และ 12
+- Attribute Point แยกจาก Skill Point สำหรับ Vitality, Focus, Armor และ Resolve
+
+### HUD และ Camera
+
+- Mini Map มุมซ้ายบน แสดง Fountain, Tower, Nexus, ครีป และฮีโร่ตามกฎ Vision/Brush
+- Mini Map ย่อ/ขยายได้ คลิกซ้ายเพื่อเลื่อนกล้อง และคลิกขวาเพื่อส่งคำสั่งเดิน
+- กล้องมีสถานะ FREE และ LOCKED พร้อมปุ่มแสดงสถานะบน HUD
+- Edge Pan, scroll zoom, Space focus/temporary lock และ Y toggle lock
+- HUD ป้องกันการคลิกทะลุไปเป็นคำสั่งเดินหรือเลือกเป้าหมาย
+- Hero & Bot Controls ย่อ/ขยายได้
+- Hover Q/W/E/R เพื่อดูชื่อ Mana Cost, Base Cooldown และรายละเอียดสกิล
+- F1 เปิด Hero Profile ซึ่งมี Model Preview, Role, Lore, Passive และ Q/W/E/R
+- UI ใช้กรอบและเสียง CC0 ที่คัดเลือกไว้ใน Asset Manifest
+
+## การควบคุมบน PC
+
+| คำสั่ง | คีย์บอร์ด/เมาส์ |
 |---|---|
-| เคลื่อนที่ (Move) | **คลิกขวา (Right-Click)** บนพื้นระนาบสนาม |
-| โจมตีปกติ (Basic Attack) | **คลิกซ้าย (Left-Click)** หรือกดปุ่ม **A** |
-| Skill 1 | ปุ่ม **Q** (เล็งตามตำแหน่งเมาส์) |
-| Skill 2 | ปุ่ม **W** |
-| Ultimate | ปุ่ม **E** |
-| กดใช้ Active Items | ปุ่มตัวเลข **1 - 6** ตามช่องกระเป๋า |
-| เปิด / ปิด ร้านค้า (Shop) | ปุ่ม **P** หรือคลิกปุ่มบนหน้าจอ |
+| เดินและแสดง Move Marker | คลิกขวาบนสนาม |
+| โจมตีเป้าหมาย | คลิกซ้าย |
+| Attack Command | A |
+| Skill 1 / 2 / 3 / Ultimate | Q / W / E / R |
+| อัปสกิลด่วน | Ctrl + Q / W / E / R |
+| Active Item ช่อง 1-6 | 1-6 |
+| Talent | T |
+| Attribute Panel | Ctrl + U |
+| Shop ภายใน Fountain | P |
+| Hero Profile | F1 |
+| Scoreboard/Stats | Tab |
+| Focus ตัวละคร | กด Space หนึ่งครั้ง |
+| Lock กล้องชั่วคราว | กด Space ค้าง |
+| สลับ FREE/LOCKED | Y หรือปุ่มบน HUD |
+| เลื่อนกล้อง | Edge Pan |
+| Zoom | Scroll Wheel |
+| เลื่อนกล้องด้วย Mini Map | คลิกซ้ายบน Mini Map |
+| สั่งเดินด้วย Mini Map | คลิกขวาบน Mini Map |
 
----
+## วิธีเปิดทดสอบใน Unity
 
-## 🚀 วิธีการเปิดทดสอบใน Unity (Getting Started)
+1. เปิดโฟลเดอร์โปรเจกต์นี้ผ่าน Unity Hub ด้วย **Unity 6000.5.10f1**
+2. รอ Unity Import Assets และ Script Compilation ให้เสร็จ
+3. เปิด Scene `Assets/Scenes/DuelArena.unity`
+4. ตรวจ Console ว่าไม่มี compile error
+5. กด Play ใน Unity Editor
 
-1. เปิดโปรเจกต์นี้ด้วย **Unity Hub** (แนะนำ Unity 2022.3 LTS หรือใหม่กว่า พร้อม URP Template)
-2. เปิด Scene เปล่า (New Scene)
-3. สร้าง GameObject เปล่าขึ้นมา 1 ตัวใน Hierarchy (เช่น ตั้งชื่อว่า `MatchRunner`)
-4. แปะสคริปต์ `VerticalSliceBootstrap` ลงใน GameObject นั้น
-5. กดปุ่ม **Play** ใน Unity Editor:
-   - ระบบจะสร้างสนาม 70x20m, แสง, ป้อมปราการ 2 ฝั่ง, ตัวละครผู้เล่น, บอท, ครีป, กล้อง และ HUD ให้โดยอัตโนมัติ พร้อมเล่นได้ทันที!
+รอบทดสอบ Phase 3 แนะนำให้ตรวจอย่างน้อย:
 
----
+1. ใช้ Q/W/E/R ของฮีโร่ทั้ง 4 ซ้ำหลังคูลดาวน์และหลัง Mana ฟื้น
+2. เปรียบเทียบ projectile, ground area, impact, สี และเสียงของทุกสกิล
+3. ตรวจ Idle/Walk/Attack/Cast ว่ากลับสถานะถูกต้องและเท้าไม่ลื่น
+4. ตรวจคลิกขวา, Move Marker, HUD input shield และ Shop
+5. ตรวจ Edge Pan, Space, Y และปุ่ม CAMERA FREE/LOCKED
+6. ตรวจ Mini Map ทั้งย่อ/ขยาย, เลื่อนกล้อง และสั่งเดิน
+7. ตรวจ Tooltip และ Hero Profile ด้วย F1 ที่ความละเอียดหน้าจอจริง
 
-## 📁 โครงสร้างโปรเจกต์ (Decoupled Core Structure)
+## โครงสร้างโปรเจกต์
 
 ```text
-Assets/Scripts/
-├── Core/             # Simulation Core (Pure C# Logic 30 Ticks/sec ไม่ขึ้นกับ MonoBehaviour)
-│   ├── AI/           # Multi-tier Bot Brain & FSM States
-│   ├── Economy/      # Player Wallet & Gold Systems
-│   ├── Entities/     # HeroBase3D, Vorkas, Zenthis, Korvax, Gravitor, DummyTarget
-│   ├── FSM/          # Generic Finite State Machine
-│   ├── Input/        # IInputAdapter (Input Abstraction Layer)
-│   ├── Items/        # Inventory & ShopSystem
-│   ├── Match/        # MatchSimulation & Rules
-│   ├── Minions/      # MinionEntity & CreepSpawner
-│   └── Structures/   # TowerEntity & Mechanics
-├── Data/             # Enums, Data Models, Item Schemas, Structure Stats
-└── Presentation/     # Unity MonoBehaviour, Camera, Views, UI & Auto Test Bootstrapper
+Assets/
+├── Presentation/               # Material, model, prefab และ visual presentation assets
+├── Resources/KOA/              # Runtime-loaded VFX, audio และ UI assets
+├── Scenes/                     # DuelArena และ scene assets
+├── Scripts/
+│   ├── Core/                   # Pure C# simulation logic
+│   │   ├── AI/                 # FSM และ Bot difficulty
+│   │   ├── Economy/            # Wallet และ Gold
+│   │   ├── Entities/           # Hero และ target entities
+│   │   ├── Input/              # Input abstraction contract
+│   │   ├── Items/              # Inventory และ Shop
+│   │   ├── Match/              # Match simulation และ rules
+│   │   ├── Minions/            # Minion และ wave spawner
+│   │   ├── Structures/         # Tower และ Nexus
+│   │   ├── Vision/             # Vision และ Brush rules
+│   │   └── World/              # Arena bounds และ world contracts
+│   ├── Data/                   # Enums, item/structure models และ schemas
+│   ├── Editor/                 # Setup, diagnostics และ verification tools
+│   └── Presentation/           # MonoBehaviour, camera, input, UI, VFX และ views
+└── ThirdParty/                 # Third-party assets และ license files
 ```
 
----
+Simulation Core ห้ามอ้างอิง MonoBehaviour, GameObject, Animator หรือ UI โดยตรง Presentation จะอ่าน state/event จาก Core แล้วแปลงเป็นภาพ เสียง และ input feedback
 
-## 📜 เอกสารอ้างอิง
-- [Project Requirement v1.0.0](docs/Project_KOA_1v1_Complete_Requirement_v1.0.0.md)
+## Assets และสิทธิ์การใช้งาน
+
+Demo ปัจจุบันใช้และทดลอง Asset ฟรีจาก Kenney และ Quaternius พร้อมเก็บ license ที่เกี่ยวข้องไว้ใต้ `Assets/ThirdParty` รายการไฟล์ที่คัดใช้ ตำแหน่งต้นฉบับ checksum และแหล่งดาวน์โหลดอยู่ใน [Demo Asset Manifest](docs/Project_KOA_Demo_Asset_Manifest.md)
+
+ก่อนนำ Asset ใหม่เข้าโปรเจกต์:
+
+- ตรวจ license จากหน้าผู้สร้างและไฟล์ที่มากับชุด Asset
+- เก็บไฟล์ license และ source URL
+- บันทึกไฟล์ที่นำมาใช้จริงใน Asset Manifest
+- ห้ามสมมติว่า “ดาวน์โหลดฟรี” เท่ากับอนุญาตเชิงพาณิชย์
+
+## เอกสารอ้างอิง
+
+- [Complete Requirement v1.0.0](docs/Project_KOA_1v1_Complete_Requirement_v1.0.0.md)
 - [Production Roadmap](docs/Project_KOA_Production_Roadmap.md)
+- [Demo Asset Manifest](docs/Project_KOA_Demo_Asset_Manifest.md)
+- [MOBA Standard Control & Camera Research](docs/Project_KOA_MOBA_Standard_Control_Camera_Research_2026-09-09.md)
+- [Phase Status](docs/Project_KOA_Phase_Status_2026-09-08.md)
 - [Agent Guidelines](AGENTS.md)
+
+## Deferred Scope
+
+สิ่งต่อไปนี้ยังไม่ใช่ implementation ของ Version 1.0.0 แบบ 1v1:
+
+- Mobile controls และ Mobile build
+- Multiplayer networking และ matchmaking
+- 5v5, แผนที่ 3 เลน, Jungle Camp และ Neutral Monster
+- Ranked-only Secret Shop, Ward, Tree-consume Healing และ Gold Buyback
+- Item Recipe/Crafting แบบหลายขั้น
+
+ข้อกำหนดแนวคิดสำหรับ Ranked 5v5 ถูกแยกไว้ใน Requirement Section 12.1 และยังต้องผ่าน Mode Rule Set, UX, Economy และ Balance Review ก่อนเริ่ม implementation

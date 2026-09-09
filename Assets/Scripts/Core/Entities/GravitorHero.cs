@@ -1,6 +1,7 @@
 using KOA.Core.Minions;
 using KOA.Data.Enums;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace KOA.Core.Entities
@@ -35,12 +36,24 @@ namespace KOA.Core.Entities
         // Timers & Shield
         public float PassiveCooldownRemaining { get; private set; } = 0f;
         public float CurrentShield { get; private set; } = 0f;
+        public float ShieldRemaining { get; private set; } = 0f;
         public float Skill1CooldownRemaining { get; private set; } = 0f;
         public float Skill2CooldownRemaining { get; private set; } = 0f;
         public float Skill3CooldownRemaining { get; private set; } = 0f;
         public float UltimateCooldownRemaining { get; private set; } = 0f;
         public float AttackCooldownRemaining { get; private set; } = 0f;
         public float BaseAttackCooldown { get; set; } = 1.2f; // Tank — โจมตีเร็ว เพราะเข้าใกล้และเป็น Melee
+
+        private sealed class ActiveGravitonWell
+        {
+            public Vector3 Center;
+            public List<ITargetable> Targets;
+            public float DamagePerTick;
+            public float TickTimer = 0.5f;
+            public int TicksRemaining = 4;
+        }
+
+        private readonly List<ActiveGravitonWell> _activeWells = new List<ActiveGravitonWell>();
 
         // Navigation
         public Vector3 TargetDestination { get; private set; }
@@ -59,7 +72,7 @@ namespace KOA.Core.Entities
             baseArmor: 36f,        // Balance Pass: 42 → 36 (ลด armor reduction จาก 29.5% → 26.5%)
             baseMr: 36f,
             baseAd: 48f,
-            baseSpeed: 6.9f,
+            baseSpeed: 4.1f,
             attackRange: 2.0f,
             statGrowth: HeroStatGrowth.GetGrowthFor("Gravitor")
         )
@@ -70,8 +83,7 @@ namespace KOA.Core.Entities
 
         public override void SetMoveDestination(Vector3 destination)
         {
-            destination.y = Position.y;
-            TargetDestination = destination;
+            TargetDestination = ClampMoveDestination(destination);
             IsMoving = true;
         }
 
@@ -83,7 +95,7 @@ namespace KOA.Core.Entities
 
         public override bool TryBasicAttack(ITargetable target)
         {
-            if (!IsAlive || target == null || !target.IsAlive) return false;
+            if (!CanPerformActions || target == null || !target.IsAlive) return false;
             if (target.TeamId == TeamId && target.TeamId != -1) return false;
 
             float distance = Vector3.Distance(Position, target.Position);
@@ -98,6 +110,7 @@ namespace KOA.Core.Entities
 
             target.TakeDamage(EffectiveAttackDamage, DamageType.Magic, HeroId);
             AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
+            InvokeBasicAttackExecuted(target.Position);
             return true;
         }
 
@@ -112,7 +125,7 @@ namespace KOA.Core.Entities
             if (!IsAlive || Skill1Rank <= 0 || Skill1CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill1ManaCost)) return false;
 
-            Skill1CooldownRemaining = Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 1.0f);
+            Skill1CooldownRemaining = ApplyAbilityCooldownReduction(Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 1.0f));
 
             if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
@@ -123,10 +136,10 @@ namespace KOA.Core.Entities
                     Vector3 pullDest = Position + (Rotation * Vector3.forward * 1.8f);
                     if (target is DummyTarget dt) dt.Position = pullDest;
                     else if (target is MinionEntity me) me.Position = pullDest;
-                    else if (target is HeroBase3D hb) hb.Position = pullDest;
+                    else if (target is HeroBase3D hb) hb.TryDisplace(pullDest);
 
-                    float baseDmg = 65f + (Skill1Rank - 1) * 45f;
-                    float damage = baseDmg + (EffectiveAttackDamage * 0.45f);
+                    float baseDmg = 70f + (Skill1Rank - 1) * 40f;
+                    float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
                     target.TakeDamage(damage, DamageType.Magic, HeroId);
                 }
             }
@@ -146,7 +159,7 @@ namespace KOA.Core.Entities
             if (!IsAlive || Skill2Rank <= 0 || Skill2CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill2ManaCost)) return false;
 
-            Skill2CooldownRemaining = Mathf.Max(7.0f, Skill2CooldownDuration - (Skill2Rank - 1) * 1.0f);
+            Skill2CooldownRemaining = ApplyAbilityCooldownReduction(Mathf.Max(7.0f, Skill2CooldownDuration - (Skill2Rank - 1) * 1.0f));
 
             if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
@@ -154,13 +167,13 @@ namespace KOA.Core.Entities
                 if (dist <= Skill2Radius)
                 {
                     Vector3 pushDir = (target.Position - Position).normalized;
-                    Vector3 pushDest = target.Position + pushDir * 2.5f;
+                    Vector3 pushDest = target.Position + pushDir * 3.0f;
                     if (target is DummyTarget dt) dt.Position = pushDest;
                     else if (target is MinionEntity me) me.Position = pushDest;
-                    else if (target is HeroBase3D hb) hb.Position = pushDest;
+                    else if (target is HeroBase3D hb) hb.TryDisplace(pushDest);
 
-                    float baseDmg = 70f + (Skill2Rank - 1) * 45f;
-                    float damage = baseDmg + (EffectiveAttackDamage * 0.5f);
+                    float baseDmg = 80f + (Skill2Rank - 1) * 45f;
+                    float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.55f));
                     target.TakeDamage(damage, DamageType.Magic, HeroId);
                 }
             }
@@ -181,7 +194,7 @@ namespace KOA.Core.Entities
             if (!TryConsumeMana(Skill3ManaCost)) return false;
 
             float cd = Mathf.Max(6.0f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f);
-            Skill3CooldownRemaining = cd;
+            Skill3CooldownRemaining = ApplyAbilityCooldownReduction(cd);
 
             Vector3 toGround = groundPos - Position;
             toGround.y = 0;
@@ -189,8 +202,8 @@ namespace KOA.Core.Entities
             Vector3 center = dist > 0.1f ? Position + (toGround.normalized * dist) : Position;
 
             bool hit = false;
-            float baseDmg = 75f + (Skill3Rank - 1) * 45f;
-            float damage = baseDmg + (EffectiveAttackDamage * 0.50f);
+            float damage = EffectiveSkillDamage(40f + (Skill3Rank - 1) * 25f);
+            var trackedTargets = new List<ITargetable>();
 
             if (targets != null)
             {
@@ -202,10 +215,23 @@ namespace KOA.Core.Entities
                         if (d <= Skill3Radius + t.Radius)
                         {
                             hit = true;
+                            trackedTargets.Add(t);
                             t.TakeDamage(damage, DamageType.Magic, HeroId);
+                            if (t is HeroBase3D heroTarget)
+                                heroTarget.ApplyMovementSlow(0.50f, 2.5f);
                         }
                     }
                 }
+            }
+
+            if (trackedTargets.Count > 0)
+            {
+                _activeWells.Add(new ActiveGravitonWell
+                {
+                    Center = center,
+                    Targets = trackedTargets,
+                    DamagePerTick = damage
+                });
             }
 
             OnGravitonWellCast?.Invoke(center, Skill3Radius, hit);
@@ -224,10 +250,12 @@ namespace KOA.Core.Entities
             if (!IsAlive || UltimateRank <= 0 || UltimateCooldownRemaining > 0f) return false;
             if (!TryConsumeMana(UltimateManaCost)) return false;
 
-            UltimateCooldownRemaining = 120f - (UltimateRank * 15f);
+            UltimateCooldownRemaining = ApplyAbilityCooldownReduction(120f - (UltimateRank * 15f));
 
-            Vector3 center = groundPos;
-            center.y = Position.y;
+            Vector3 toGround = groundPos - Position;
+            toGround.y = 0f;
+            float castDistance = Mathf.Min(toGround.magnitude, UltimateRange);
+            Vector3 center = castDistance > 0.01f ? Position + toGround.normalized * castDistance : Position;
 
             if (target != null && target.IsAlive && (target.TeamId != TeamId || target.TeamId == -1))
             {
@@ -236,10 +264,13 @@ namespace KOA.Core.Entities
                 {
                     if (target is DummyTarget dt) dt.Position = center;
                     else if (target is MinionEntity me) me.Position = center;
-                    else if (target is HeroBase3D hb) hb.Position = center;
+                    else if (target is HeroBase3D hb)
+                    {
+                        if (hb.TryDisplace(center)) hb.ApplyStun(1.5f);
+                    }
 
-                    float baseDmg = 180f + (UltimateRank - 1) * 90f;
-                    float damage = baseDmg + (EffectiveAttackDamage * 0.8f);
+                    float baseDmg = 260f + (UltimateRank - 1) * 130f;
+                    float damage = EffectiveSkillDamage(baseDmg + EffectiveAttackDamage);
                     target.TakeDamage(damage, DamageType.Magic, HeroId);
                 }
             }
@@ -252,13 +283,13 @@ namespace KOA.Core.Entities
 
         public override void TakeDamage(float rawDamage, DamageType damageType, string attackerId = null)
         {
-            if (!IsAlive) return;
+            if (!IsAlive || IsInvulnerable) return;
 
-            // Passive: Antigravity Shield (Section 6.4)
-            // Balance Pass: ลด shield จาก 15% → 10% MaxHP เพื่อลด burst survivability
+            // Passive: Antigravity Shield = 80 + 8% Max HP นาน 3 วินาที (Section 6.4)
             if (PassiveCooldownRemaining <= 0f && CurrentShield <= 0f)
             {
-                CurrentShield = EffectiveMaxHp * 0.10f; // โล่ 10% Max HP (Balance Pass)
+                CurrentShield = 80f + (EffectiveMaxHp * 0.08f);
+                ShieldRemaining = 3f;
                 PassiveCooldownRemaining = PassiveInternalCooldown;
             }
 
@@ -274,6 +305,7 @@ namespace KOA.Core.Entities
                 {
                     remainingDamage -= CurrentShield;
                     CurrentShield = 0f;
+                    ShieldRemaining = 0f;
                 }
             }
 
@@ -285,16 +317,24 @@ namespace KOA.Core.Entities
 
         public override void SimulationTick(float deltaTime)
         {
+            TickSharedSystems(deltaTime);
             if (!IsAlive) return;
 
-            Inventory.SimulationTick(deltaTime);
-
             if (PassiveCooldownRemaining > 0f) PassiveCooldownRemaining -= deltaTime;
+            if (ShieldRemaining > 0f)
+            {
+                ShieldRemaining = Mathf.Max(0f, ShieldRemaining - deltaTime);
+                if (ShieldRemaining <= 0f) CurrentShield = 0f;
+            }
             if (Skill1CooldownRemaining > 0f) Skill1CooldownRemaining -= deltaTime;
             if (Skill2CooldownRemaining > 0f) Skill2CooldownRemaining -= deltaTime;
             if (Skill3CooldownRemaining > 0f) Skill3CooldownRemaining -= deltaTime;
             if (UltimateCooldownRemaining > 0f) UltimateCooldownRemaining -= deltaTime;
             if (AttackCooldownRemaining > 0f) AttackCooldownRemaining = UnityEngine.Mathf.Max(0f, AttackCooldownRemaining - deltaTime);
+
+            TickActiveWells(deltaTime);
+
+            if (IsStunned) return;
 
             if (IsMoving)
             {
@@ -321,6 +361,31 @@ namespace KOA.Core.Entities
                     }
                     Rotation = Quaternion.LookRotation(moveDir);
                 }
+            }
+        }
+
+        private void TickActiveWells(float deltaTime)
+        {
+            for (int i = _activeWells.Count - 1; i >= 0; i--)
+            {
+                ActiveGravitonWell well = _activeWells[i];
+                well.TickTimer -= deltaTime;
+                while (well.TickTimer <= 0f && well.TicksRemaining > 0)
+                {
+                    well.TickTimer += 0.5f;
+                    well.TicksRemaining--;
+                    foreach (ITargetable target in well.Targets)
+                    {
+                        if (target != null && target.IsAlive && Vector3.Distance(well.Center, target.Position) <= Skill3Radius + target.Radius)
+                        {
+                            target.TakeDamage(well.DamagePerTick, DamageType.Magic, HeroId);
+                            if (target is HeroBase3D heroTarget)
+                                heroTarget.ApplyMovementSlow(0.50f, 2.5f);
+                        }
+                    }
+                }
+
+                if (well.TicksRemaining <= 0) _activeWells.RemoveAt(i);
             }
         }
     }

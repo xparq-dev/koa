@@ -1,114 +1,149 @@
-# Production Roadmap — Project KOA
-## เส้นทางจาก 0 ถึง Version 1.0.0 (PC-only) สำหรับนักพัฒนาคนเดียว
+# Production Roadmap — Project KOA (Kronos Origin Area)
+## เส้นทางจาก 0 ถึง Version 1.0.0 (PC-only) — ฉบับปรับปรุงตาม Scope ใหม่
 
-**บริบท:** 1 คน, Full-time, มือใหม่ Unity/C#, ใช้ AI (Claude Code) ช่วยเขียนโค้ด/debug/อธิบายเต็มที่
-**เป้าหมาย:** 1.0.0 บน PC ตาม `Project_KOA_1v1_Complete_Requirement_v1.0.0.md`
-**ประมาณการเวลารวม:** ~32 สัปดาห์ (~8 เดือน) ทำงานเต็มเวลา — ตัวเลขนี้รวม buffer สำหรับการเรียนรู้แล้ว อย่ากดดันตัวเองให้เร็วกว่านี้ในช่วงแรก เพราะพื้นฐานที่แน่นจะทำให้ Phase หลังเร็วขึ้นเยอะ
+**บริบท:** 1 คน, Full-time, มือใหม่ Unity/C#, ใช้ AI (Claude Code / Unity AI Assistant) ช่วยเต็มที่
+**อ้างอิง:** `Project_KOA_1v1_Complete_Requirement_v1.0.0.md` (รวม Section 6.6-6.7 ที่เพิ่มใหม่)
 
----
+## ⚠️ สิ่งที่เปลี่ยนจาก Roadmap ฉบับก่อนหน้า
 
-## หลักการทำงานร่วมกับ AI ตลอดโปรเจกต์
+Scope ของเกมขยายขึ้นจริงจากที่วางแผนไว้ตอนแรก:
 
-AI ช่วยได้ดีที่สุดในงานเหล่านี้ — ใช้ให้เต็มที่:
-- **เขียน Boilerplate/Scaffold โค้ด** (เช่น สร้างคลาส C# ตาม schema, สร้าง FSM skeleton, สร้าง JSON loader)
-- **อธิบาย Error message** ที่ Unity/C# ขึ้นเวลา compile ไม่ผ่าน (วางข้อความ error เต็มๆ ให้ AI อ่าน)
-- **Review โค้ดที่เขียนเอง** ก่อน commit — ถามหา bug หรือจุดที่ไม่ตรงกับสถาปัตยกรรม Decoupled Core
-- **แปลง Requirement เป็นโค้ดตรงๆ** เช่น เอาสูตร Damage Reduction ใน Section 6 ของ Requirement ไปให้ AI แปลงเป็นฟังก์ชัน C#
+| รายการ | เดิม | ใหม่ |
+|---|---|---|
+| จำนวนสกิลต่อฮีโร่ | 2 Active + Ultimate | **3 Active + Ultimate** (16 → 20 ความสามารถรวม) |
+| ระบบ Talent Tree | ไม่มี | **มี** (เลือกที่ Level 4/8/12) |
+| ระบบ Attribute Bonus | ไม่มี | **มี** (ลงแต้มทุก Level Up) |
+| Tower Escalation | ไม่มี | **มี** (Cannon Minion / Super Creep) |
+| แผนที่ | ~70m x 20m ประมาณการ | **130m x 26m พิกัดแน่นอน** (รายละเอียดเพิ่ม ไม่กระทบเวลามาก) |
 
-AI ช่วย**ไม่ได้ดี**ในงานเหล่านี้ — ต้องลงมือเองในโปรแกรม Unity Editor จริง:
-- การจัด Scene, วาง GameObject, ปรับ Inspector values ด้วยมือ
-- Import โมเดล/Animation แล้วเช็คว่าเข้ากับ Prefab ถูกต้อง
-- การเทส "ความรู้สึก" ของ gameplay (feel) ต้องเล่นเองเท่านั้น
-
-**แนะนำ:** ใช้ **Claude Code** (ติดตั้งในเครื่อง ทำงานกับไฟล์โปรเจกต์ Unity โดยตรง) แทนการ copy-paste โค้ดไปมาระหว่างแชทกับ Editor — จะเร็วกว่ามาก
+**ผลกระทบต่อ Timeline:** จากเดิม ~32 สัปดาห์ (~8 เดือน) เพิ่มเป็น **~47 สัปดาห์ (~11-12 เดือน)** — เพิ่มขึ้น ~47% ตรงตามสัดส่วนงานที่เพิ่มจริง ไม่ใช่ตัวเลขเดา
 
 ---
 
-## Phase 0: Foundation & Setup (สัปดาห์ 1-6)
+## หลักการทำงานร่วมกับ AI (คงเดิมจากฉบับก่อน)
 
-**เป้าหมาย:** ปูพื้นฐาน Unity/C# ให้แน่นพอจะเริ่มงานจริงได้ ไม่ใช่การสร้างเกม KOA เลยในช่วงนี้
+**ใช้ AI เต็มที่กับ:** เขียน Boilerplate/Scaffold, อธิบาย Error, Review โค้ด, แปลงสูตรจาก Requirement เป็นโค้ด
+**ต้องลงมือเองใน Editor:** จัด Scene/GameObject, Import โมเดล/Animation, เทสความรู้สึกของ Gameplay
+**เครื่องมือแนะนำ:** Claude Code หรือ Unity AI Assistant (เชื่อมผ่าน Unity AI Gateway ได้) ทำงานกับไฟล์โปรเจกต์โดยตรง
+
+---
+
+## Phase 0: Foundation & Setup (สัปดาห์ 1-6) — ไม่เปลี่ยนจากเดิม
+
+พื้นฐาน Unity/C# ไม่ขึ้นกับ Scope ของเกม จึงใช้เวลาเท่าเดิม
 
 | สัปดาห์ | งาน |
 |---|---|
-| 1 | ติดตั้ง Unity Hub + Unity URP Template, เรียนรู้ Interface (Scene, Hierarchy, Inspector, Project), ทำ Unity official "Roll-a-Ball" tutorial ให้จบ |
-| 2 | เรียน C# พื้นฐานให้แน่น: class, inheritance (สำคัญมากเพราะ `HeroBase3D` เป็น abstract class), coroutine, event/delegate |
-| 3 | หัด Rigidbody + Collider (3D) เขียน Controller เดินไปมาง่ายๆ ด้วย WASD (ยังไม่ใช่ KOA — เป็น practice project แยก) |
-| 4 | หัดทำ Simple FSM (State Pattern) ด้วย enum + switch-case ก่อน แล้วค่อยลองแบบ Interface-based FSM ให้เข้าใจหลักการที่ Section 3 ของ Requirement ต้องใช้ |
-| 5 | หัด Unity UI (Canvas, World-space UI สำหรับ HP bar เหนือหัวตัวละคร) |
-| 6 | ตั้ง Git repository จริงสำหรับโปรเจกต์ KOA, ตั้งโครงสร้างโฟลเดอร์ (Scripts/Core, Scripts/Presentation, Scripts/Data ตาม Decoupled Core), เริ่มเขียน `HeroBase3D.cs` จริงตาม Section 2.1 |
+| 1 | Unity Hub + URP Template, ทำ "Roll-a-Ball" tutorial |
+| 2 | C# พื้นฐาน: class, inheritance, coroutine, event/delegate |
+| 3 | Rigidbody + Collider (3D), Controller เดิน WASD (practice project แยก) |
+| 4 | Simple FSM (State Pattern) ด้วย enum + switch-case |
+| 5 | Unity UI (Canvas, World-space UI) |
+| 6 | Git repo, โครงสร้างโฟลเดอร์ (Core/Presentation/Data ตาม Decoupled Core), เริ่ม `HeroBase3D.cs` |
 
-**Exit Criteria:** ทำ Controller เดิน 3D ง่ายๆ ได้เอง, เข้าใจ inheritance พอจะอ่าน error message เข้าใจโดยไม่ต้องพึ่ง AI ทุกบรรทัด
-
----
-
-## Phase 1: Vertical Slice — "1 ฮีโร่ ต่อยหุ่น" (สัปดาห์ 7-14)
-
-**เป้าหมาย:** พิสูจน์ว่าสถาปัตยกรรม Decoupled Core ทำงานได้จริง แบบง่ายที่สุดเท่าที่จะทำได้ — **ยังไม่ทำครบ 4 ฮีโร่, ยังไม่มี Bot, ยังไม่มี Shop/Economy**
-
-| สัปดาห์ | งาน |
-|---|---|
-| 7-8 | สร้าง Simulation Core: Vorkas เดินได้ (click-to-move), มี HP/Mana, โจมตีพื้นฐานได้ |
-| 9-10 | สร้าง Input Abstraction Layer (Section 1.1) เวอร์ชัน PC-only ก่อน — ให้ AI ช่วยออกแบบ interface `IInputAdapter` |
-| 11 | ทำ Skill 1 ของ Vorkas (Iron Cleave — ประเภท `SKILLSHOT_LINE`) ให้ยิงได้จริง มี Cooldown ตาม Section 6.1 |
-| 12 | สร้าง Dummy Target (หุ่นนิ่งไม่โจมตีกลับ) รับดาเมจได้ ตายได้ แสดง Damage Popup |
-| 13 | ทำกล้อง Top-down ตาม Section 7.1 |
-| 14 | Playtest + แก้บั๊ก + ทำ HP bar world-space UI ตาม Section 8 |
-
-**Exit Criteria:** เดิน-โจมตี-ใช้สกิล-หุ่นตาย ได้ครบวงจร ไม่มี Critical Bug
+**Exit Criteria:** ทำ Controller เดิน 3D เองได้, อ่าน error message เข้าใจโดยไม่ต้องพึ่ง AI ทุกบรรทัด
 
 ---
 
-## Phase 2: Core Loop สมบูรณ์ — Bot + แผนที่ + เศรษฐกิจ (สัปดาห์ 15-22)
+## Phase 1: Vertical Slice — "Vorkas ครบชุดสกิล" (สัปดาห์ 7-16, 10 สัปดาห์)
 
-**เป้าหมาย:** เอา Vorkas ตัวเดียวสู้กับ AI Bot ได้จบเกมจริง (ชนะ/แพ้)
+**เป้าหมาย:** พิสูจน์สถาปัตยกรรม Decoupled Core ด้วย Vorkas ตัวเดียว **แต่ครบทั้ง Passive + 3 Active + Ultimate** (เพิ่มจากเดิมที่ทำแค่ 2 สกิล) เพราะ Vorkas ใช้ Type ครบ 3 ใน 4 แบบของ Taxonomy (`SKILLSHOT_LINE`, `SELF_CAST`, `GROUND_TARGET_AOE`) เหมาะเป็นต้นแบบให้ฮีโร่ตัวอื่นในเฟสถัดไป
 
 | สัปดาห์ | งาน |
 |---|---|
-| 15-16 | สร้างแผนที่จริงตาม Section 3 (เลนเดียว, Fountain 2 ฝั่ง, Bush 2 จุด) |
-| 17 | สร้าง Creep Spawner ตาม Section 3.2 |
-| 18-19 | สร้าง FSM Bot **Medium Tier เท่านั้นก่อน** (Section 9) — เอา Easy/Hard ไปทำทีหลังใน Phase 3 |
-| 20 | สร้างระบบ Tower (2 tier + Nexus) ตาม Section 3.3, ระบบ Economy (Section 4) |
-| 21 | ระบบ Leveling/EXP (Section 2.2), Respawn Timer (Section 2.3) |
-| 22 | Playtest เต็มแมตช์ Vorkas vs Bot ตั้งแต่ต้นจนจบ (ชนะ = ทำลาย Nexus) |
+| 7-8 | Simulation Core: Vorkas เดิน (click-to-move), HP/Mana, โจมตีพื้นฐาน |
+| 9-10 | Input Abstraction Layer (Section 1.1) เวอร์ชัน PC-only |
+| 11 | **Q: Iron Cleave** (`SKILLSHOT_LINE`) ตาม Section 6.1 |
+| 12 | **W: Vanguard's Will** (`SELF_CAST`) |
+| 13 | **E: Seismic Slam** (`GROUND_TARGET_AOE`) — สกิลที่ 3 ที่เพิ่มใหม่ |
+| 14 | **R: Rebellion Impact** (Ultimate, `GROUND_TARGET_AOE` + Knockup + skill rank scaling 1/2/3) |
+| 15 | Dummy Target รับดาเมจ/ตาย, Damage Popup, HP bar world-space UI |
+| 16 | กล้อง Top-down (Section 7.1), Playtest ครบชุดสกิล, แก้บั๊ก |
 
-**Exit Criteria:** เล่นแมตช์ 1v1 กับ Bot จบได้ทั้งเกม (Spawn → Laning → Tower → Nexus → Win Screen) ด้วย Vorkas ตัวเดียว
+**Exit Criteria:** Vorkas ใช้ได้ครบ Passive + 4 สกิลกับหุ่นนิ่ง ไม่มี Critical Bug
 
 ---
 
-## Phase 3: ฮีโร่ครบ 4 ตัว + Shop + Balance (สัปดาห์ 23-28)
+## Phase 2: Core Loop สมบูรณ์ — Bot + แผนที่ + เศรษฐกิจ + Escalation (สัปดาห์ 17-27, 11 สัปดาห์)
 
-**เป้าหมาย:** ขยายจาก 1 ฮีโร่เป็น 4 ฮีโร่ (ใช้ pattern ที่ทำกับ Vorkas ซ้ำ) + เพิ่ม Shop + Bot อีก 2 ระดับความยาก
+**เป้าหมาย:** Vorkas ตัวเดียวสู้ AI Bot จบเกมได้จริง รวมระบบ Tower Escalation ใหม่
 
 | สัปดาห์ | งาน |
 |---|---|
-| 23-24 | สร้าง Zenthis + Korvax + Gravitor ตาม Section 6.2-6.4 (ใช้ Ability Taxonomy Section 6.5 เป็นแม่แบบ ลอกโครงสร้างจาก Vorkas) |
-| 25 | สร้างระบบ Shop + ไอเทม 8 รายการ (Section 5) |
-| 26 | เพิ่ม FSM Bot Easy Tier + Hard Tier (Section 3.2 ของเอกสารต้นฉบับ — Prediction Algorithm ของ Hard Tier อาจต้องให้ AI ช่วยเขียนสมการเวกเตอร์) |
-| 27 | UI/HUD ให้ครบตาม Section 8 (Kill Feed, Cooldown radial, Gold/Level counter) |
-| 28 | Balance Pass รอบแรก — เล่นทดสอบทุกคู่ matchup (4 ฮีโร่ x 4 ฮีโร่) ปรับค่าตัวเลขที่รู้สึกว่าไม่สมดุล |
+| 17-18 | แผนที่จริงตาม Section 3.1 (130m x 26m, พิกัด Fountain/Tower/Bush, ขอบเขตบังคับ และ Mini Map ที่เคารพ Vision/Brush) |
+| 19 | Creep Spawner เวฟพื้นฐาน (Section 3.2) |
+| 20 | **Tower Escalation System** (Cannon Minion เมื่อพัง Outer Tower, Super Creep เมื่อพัง Inner Tower) — ระบบใหม่ |
+| 21-22 | FSM Bot **Medium Tier เท่านั้นก่อน** (Easy/Hard ไปทำ Phase 3) |
+| 23 | ระบบ Tower (2 tier + Nexus) ตาม Section 3.3 พร้อม Mechanics (Heating Laser, Plating, AOE Slow) |
+| 24 | ระบบเศรษฐกิจ (Section 4: Gold/EXP sources) |
+| 25 | Leveling/EXP (Section 2.2), Respawn Timer (Section 2.3), ระบบแจก Skill Point ตอน Level Up |
+| 26 | เชื่อม Skill rank-up เข้ากับปุ่ม Quick Skill Level-Up (Ctrl+Q/W/E/R ตาม Section 7.2) |
+| 27 | Playtest เต็มแมตช์ Vorkas vs Bot ตั้งแต่ Spawn จนถึง Nexus แตก |
 
-**Exit Criteria:** เล่นได้ครบ 4 ฮีโร่ x 3 ระดับความยาก Bot, Shop ใช้งานได้จริง
+**Exit Criteria:** เล่นแมตช์ 1v1 กับ Bot จบทั้งเกมได้ รวม Tower Escalation ทำงานถูกต้องเมื่อป้อมพัง
 
 ---
 
-## Phase 4: Hardening & Release Prep (สัปดาห์ 29-32)
+## Phase 3: ฮีโร่ครบ 4 ตัว + Shop + Talent + Attribute + Balance (สัปดาห์ 28-43, 16 สัปดาห์)
+
+**เป้าหมาย:** ขยายจาก 1 ฮีโร่เป็น 4 ฮีโร่ (ใช้ pattern จาก Vorkas) + เพิ่มระบบใหม่ทั้งหมดที่ยังไม่เคยทำ
 
 | สัปดาห์ | งาน |
 |---|---|
-| 29 | Bug bash — เล่นซ้ำๆ หาบั๊ก จด list ทั้งหมด |
-| 30 | แก้บั๊กจาก list, Performance profiling (ใช้ Unity Profiler เช็ค FPS บนสเปกที่ใกล้เคียง minimum spec) |
-| 31 | รัน Acceptance Criteria ทั้ง 6 ข้อจาก Section 11 ของ Requirement ทีละข้อ |
-| 32 | Build สุดท้าย, ทำ README/คู่มือติดตั้งสำหรับผู้ทดสอบกลุ่มแรก |
+| 28-30 | **Zenthis** ครบ 4 ท่า (Section 6.2) — สกิล E: Temporal Rift เป็นสกิลใหม่ที่ต้องทำเพิ่ม |
+| 31-33 | **Korvax** ครบ 4 ท่า (Section 6.3) — มี `SINGLE_TARGET` type ตัวแรกที่ยังไม่เคยทำ (Concussive Blast) ต้องขยาย Taxonomy Handler |
+| 34-36 | **Gravitor** ครบ 4 ท่า (Section 6.4) |
+| 37 | ระบบร้านค้า + ไอเทม 8 รายการ (Section 5) |
+| 38-39 | **Talent Tree System** (Section 6.6) — UI เลือก A/B ที่ Level 4/8/12, เชื่อมกับปุ่ม `T` |
+| 40 | **Attribute Bonus System** (Section 6.7) — UI ลงแต้ม 4 หมวด, เชื่อมกับปุ่ม `Ctrl+U` |
+| 41 | FSM Bot Easy Tier + Hard Tier (Hard ใช้ Prediction Algorithm ให้ AI ช่วยเขียนสมการเวกเตอร์) |
+| 42 | UI/HUD และ Control Polish (Section 7-8): Kill Feed, Cooldown/NO MANA state, Skill Tooltip, F1 Hero Profile, Mini Map interaction/expand, HUD input shield, Camera FREE/LOCKED และแผง Control แบบย่อได้ |
+| 43 | Combat Readability & Balance Pass รอบแรก: ทดสอบทุกคู่ matchup (4x4), textured VFX/SFX ของฮีโร่-ป้อม-ครีป, Animation timing, movement pace และปรับค่าตัวเลขที่ไม่สมดุล |
 
-**Exit Criteria:** ผ่าน Acceptance Criteria ครบ 6 ข้อ = **1.0.0 เสร็จสมบูรณ์**
+**Exit Criteria:** เล่นได้ครบ 4 ฮีโร่ x 3 ระดับความยาก Bot, Shop/Talent/Attribute ใช้งานได้จริงครบ
+
+---
+
+## Phase 4: Hardening & Release Prep (สัปดาห์ 44-47, 4 สัปดาห์)
+
+| สัปดาห์ | งาน |
+|---|---|
+| 44 | Bug bash — เล่นซ้ำๆ ครอบคลุมทุกระบบใหม่ (Talent/Attribute/Escalation) จด list บั๊กทั้งหมด |
+| 45 | แก้บั๊กจาก list, Performance profiling (Unity Profiler บนสเปกใกล้เคียง minimum spec) |
+| 46 | รัน Acceptance Criteria ทั้ง **8 ข้อ** จาก Section 11 ของ Requirement (เพิ่มจาก 6 เป็น 8 ข้อ ตามระบบใหม่) ทีละข้อ |
+| 47 | Build สุดท้าย, README/คู่มือติดตั้งสำหรับผู้ทดสอบกลุ่มแรก |
+
+**Exit Criteria:** ผ่าน Acceptance Criteria ครบ 8 ข้อ = **1.0.0 เสร็จสมบูรณ์**
+
+---
+
+## สรุปเปรียบเทียบ Timeline
+
+| Phase | เดิม | ใหม่ | ส่วนต่าง |
+|---|---|---|---|
+| Phase 0 | 6 สัปดาห์ | 6 สัปดาห์ | ไม่เปลี่ยน |
+| Phase 1 | 8 สัปดาห์ | 10 สัปดาห์ | +2 (สกิลที่ 3 + Ultimate) |
+| Phase 2 | 8 สัปดาห์ | 11 สัปดาห์ | +3 (Tower Escalation + skill rank-up) |
+| Phase 3 | 6 สัปดาห์ | 16 สัปดาห์ | +10 (สกิลที่ 3 ทุกฮีโร่ + Talent + Attribute) |
+| Phase 4 | 4 สัปดาห์ | 4 สัปดาห์ | ไม่เปลี่ยน |
+| **รวม** | **32 สัปดาห์** | **47 สัปดาห์** | **+15 สัปดาห์ (+47%)** |
 
 ---
 
 ## หลังจากนี้ (นอก Scope ของแผนนี้)
 
-- **Version 1.1.0 (Mobile Port):** เพิ่ม Touch Input Adapter ตัวใหม่เข้า Input Abstraction Layer เดิม, ปรับ UI ให้รองรับจอมือถือ, เทสบนเครื่องจริง — ประเมินเวลาเพิ่มอีก ~6-8 สัปดาห์ เพราะ Core Logic ไม่ต้องแตะเลย
-- **Phase-02 เป็นต้นไป:** ตามที่ Requirement เดิมวางไว้ (P2P, 5v5, Cloud) — ควรพิจารณาหาทีมเสริมตอนถึงจุดนี้ เพราะ Networking Code เดี่ยวๆ ก็ใช้เวลาระดับเดียวกับ 1.0.0 ทั้งหมด
+- **Version 1.1.0 (Mobile Port):** ~6-8 สัปดาห์ ตามเดิม เพราะ Core Logic ไม่ต้องแตะ
+- **Phase-02 เป็นต้นไป:** 5v5, 3-เลน, Networking — ควรพิจารณาหาทีมเสริมเมื่อถึงจุดนี้
+- **Future Ranked 5v5 Design Gate:** Secret Shop เฉพาะ Ranked, Ward System, Tree-consume Healing และ Gold Buyback ตาม Requirement Section 12.1 ต้องผ่าน Mode Rule Set, UX, Economy และ Balance Review ก่อนเริ่ม implementation; ห้ามนำเข้าร้าน 1v1 Version 1.0.0
 
 ---
 
-*แผนนี้เป็น Living Document เช่นกัน — ถ้าทำไปแล้วช้ากว่า/เร็วกว่าที่ประเมิน ให้ปรับตัวเลขสัปดาห์ตามจริง ไม่ต้องยึดติดกับตัวเลขในนี้แบบตายตัว*
+*แผนนี้เป็น Living Document — ถ้า Scope ขยายอีกระหว่างทาง (เช่น เพิ่มฮีโร่ หรือเพิ่มระบบใหม่) ให้กลับมาคำนวณ Timeline ใหม่แบบเดียวกับที่ทำในรอบนี้ อย่าปล่อยให้ Roadmap เก่ากับ Requirement ใหม่ไม่ตรงกัน เพราะจะประเมินเวลาที่เหลือผิดพลาด*
+
+---
+
+## สถานะการดำเนินงานล่าสุด
+
+อัปเดตเมื่อ **2026-09-09**: Phase 0-2 มี implementation artifacts ครบ; Phase 3 เปิดงาน Week 42-43 กลับมาเพื่อแก้ Combat Readability, Animation/Movement, Camera/Mini Map, HUD/Shop และ Free Asset integration ตามผล playtest ล่าสุด Unity batch import/script compile ผ่านแล้วและ Core verification ผ่าน 15/15; งานรอบนี้ยังต้องรอ manual playtest และการยอมรับด้านภาพ/เสียงจาก Owner ก่อนปิด Phase 3 ส่วน Phase 4 ยังต้องดำเนินการตาม Week 44-47 ก่อนประกาศ Version 1.0.0
+
+ดูหลักฐานและรายการ gate ที่เหลือใน [`Project_KOA_Phase_Status_2026-09-08.md`](Project_KOA_Phase_Status_2026-09-08.md)

@@ -4,6 +4,7 @@ using KOA.Core.Items;
 using KOA.Core.Match;
 using KOA.Core.Minions;
 using KOA.Core.Structures;
+using KOA.Data.Enums;
 using KOA.Data.Models;
 using System;
 using System.Collections.Generic;
@@ -71,10 +72,14 @@ namespace KOA.Core.AI
         {
             if (BotHero == null || !BotHero.IsAlive) return;
 
-            // Dota 2 Style: Auto-allocate skill points for Bot
+            // MOBA Standard: Auto-allocate skill and attribute points for Bot (Section 6.6-6.7)
             if (BotHero.AvailableSkillPoints > 0)
             {
                 AutoAllocateSkillPoints();
+            }
+            if (BotHero.AvailableAttributePoints > 0)
+            {
+                AutoAllocateAttributePoints();
             }
 
             // Track Enemy Velocity สำหรับ Hard Tier Prediction Algorithm
@@ -260,7 +265,7 @@ namespace KOA.Core.AI
         }
 
         /// <summary>
-        /// Dota 2 Style: บอทอัปสกิลอัตโนมัติตามลำดับความสำคัญ (Ultimate Lv6,10,12 > Talents Lv4,8,12 > Skill1/2 > Stat Bonus)
+        /// MOBA Standard: บอทอัปสกิลอัตโนมัติตามลำดับความสำคัญ (Ultimate Lv6,10,12 > Talents Lv4,8,12 > Skill1/2/3)
         /// </summary>
         public void AutoAllocateSkillPoints()
         {
@@ -314,10 +319,6 @@ namespace KOA.Core.AI
                 {
                     BotHero.TryLevelSkill2();
                 }
-                else if (BotHero.CanLevelStatBonus())
-                {
-                    BotHero.TryLevelStatBonus();
-                }
                 else
                 {
                     break;
@@ -327,6 +328,29 @@ namespace KOA.Core.AI
                 {
                     break;
                 }
+            }
+        }
+
+        /// <summary>
+        /// กระจาย Attribute Point แยกจาก Skill Point ตามบทบาทของฮีโร่ (Section 6.7)
+        /// </summary>
+        public void AutoAllocateAttributePoints()
+        {
+            if (BotHero == null) return;
+
+            while (BotHero.AvailableAttributePoints > 0)
+            {
+                int spent = BotHero.VitalityPoints + BotHero.FocusPoints + BotHero.ArmorPoints + BotHero.ResolvePoints;
+                HeroAttribute choice;
+
+                if (BotHero is ZenthisHero)
+                    choice = spent % 2 == 0 ? HeroAttribute.Focus : HeroAttribute.Resolve;
+                else if (BotHero is KorvaxHero)
+                    choice = spent % 2 == 0 ? HeroAttribute.Vitality : HeroAttribute.Resolve;
+                else
+                    choice = spent % 2 == 0 ? HeroAttribute.Vitality : HeroAttribute.Armor;
+
+                if (!BotHero.TrySpendAttributePoint(choice)) break;
             }
         }
 

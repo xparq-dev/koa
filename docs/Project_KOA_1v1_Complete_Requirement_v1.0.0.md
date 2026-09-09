@@ -81,6 +81,7 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 ### 3.1 ขนาดและโครงสร้าง (อัปเดต 130m Scale)
 - **รูปแบบ:** เลนเดียว แนวยาว (Corridor) เชื่อม Fountain ทั้งสองฝั่ง
 - **ขนาดสนามโดยประมาณ:** ยาว 130 เมตร x กว้าง 26 เมตร (1 Grid Unit = 1 เมตร)
+  - ขอบเขตที่เล่นได้คือ X = -13m ถึง +13m และ Z = -65m ถึง +65m โดยศูนย์กลางของฮีโร่ต้องเว้นขอบตามรัศมีตัวละคร การเดิน, dash, displacement, rewind และ respawn ต้องไม่สามารถพาฮีโร่ออกนอกสนาม
   - Blue Fountain: Z = -60m, Blue Nexus: Z = -46m, Blue Inner Tower: Z = -32m, Blue Outer Tower: Z = -14m
   - Red Outer Tower: Z = +14m, Red Inner Tower: Z = +32m, Red Nexus: Z = +46m, Red Fountain: Z = +60m
   - พื้นที่ปะทะกลางเลน (Center Clash Zone): ระหว่าง Outer Towers กว้าง 28 เมตร (Z = -14m ถึง +14m)
@@ -204,6 +205,13 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 | Nullifying Cloak (Active) | 800g | กดใช้: ล้างสถานะ Debuff ทั้งหมด + Immune ต่อ CC 1.0 วินาที (Cooldown 60 วิ) |
 | Gravity Anchor (Capstone) | 1800g | +300 Max HP, +30 Armor, +30 Magic Resist |
 
+### 5.3 หมวดร้านค้าและขอบเขตสินค้า
+
+- UI ร้านค้าต้องแบ่งหมวดอย่างน้อยเป็น Consumables, Attributes, Equipment, Miscellaneous และ Upgraded พร้อมหน้า All Items
+- ไอเทม 1v1 Version 1.0.0 ยังคงเป็นรายการ 8 ชิ้นใน Section 5.2; หมวดที่ยังไม่มีสินค้าให้แสดงสถานะว่างอย่างชัดเจน ห้ามดึงสินค้าของโหมดอนาคตมาปะปน
+- รายการสินค้าแต่ละชิ้นต้องแสดงชื่อ ราคา หมวด ผลค่าสถานะ และสถานะซื้อได้/ทองไม่พอ
+- การคลิก UI ร้านค้าและ Inventory ต้องไม่ส่งคำสั่งเคลื่อนที่ไปยัง Simulation Core
+
 ---
 
 ## 6. Ability System — เติมค่าตัวเลขที่ขาด (Cooldown / Mana Cost)
@@ -253,6 +261,52 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 3. **`SINGLE_TARGET`** — ล็อกเป้าหมายเดี่ยว (เช่น Magnetic Pull, Concussive Blast)
 4. **`SELF_CAST`** — ใช้กับตัวเองทันที ไม่ต้อง aim (เช่น Vanguard's Will, Hunter's Focus, Aura of Eternity, Repulsion Zone, Grand Rewind)
 
+### 6.5.1 Combat Readability และ Resource Feedback
+
+- Mana ฟื้นอัตโนมัติขณะมีชีวิตและอยู่นอก Fountain ที่ **1.25% ของ Max Mana ต่อวินาที**; Fountain regeneration ตาม Section 3.1 ยังคงเร็วกว่าและไม่ซ้อนกับค่านี้
+- HUD ของ Q/W/E/R ต้องแยกสถานะ READY, COOLDOWN, NO MANA, UNLEARNED/LOCKED ห้ามแสดง READY เมื่อ Mana ไม่พอ
+- เมื่อกดสกิลไม่สำเร็จ ต้องมีข้อความและเสียงตอบสนองที่ระบุสาเหตุ เช่น Mana ไม่พอ, ยังไม่เรียน หรือยังติด Cooldown
+- สกิลทั้ง 16 ท่าต้องแยกอ่านได้ด้วยอย่างน้อย 3 มิติ: สีประจำชุด, รูปทรง/วิถี (slash, projectile, aura, ground glyph, vortex) และจังหวะ impact
+- เอฟเฟกต์โจมตีจริงของฮีโร่ ป้อม และครีปต้องใช้ textured particle/projectile; เส้นเรขาคณิตให้ใช้เฉพาะ telegraph ที่ช่วยอ่านระยะและต้องไม่กลบเป้าหมาย
+- Animation Idle, Walk, Attack, Cast, Death ต้องแยก state ชัดเจน การโจมตี/ร่ายเริ่มจาก Core success event เท่านั้น และต้องกลับสู่ neutral idle หลังจบ state
+
+### 6.5.2 Movement Pace Baseline
+
+| Unit | Base Move Speed |
+|---|---:|
+| Vorkas | 4.4 m/s |
+| Zenthis | 4.2 m/s |
+| Korvax | 4.5 m/s |
+| Gravitor | 4.1 m/s |
+| Lane Minion | 3.25 m/s |
+
+ไอเทม, Talent, Buff และ Slow คำนวณต่อจากค่า Base นี้ตาม Section 5 และ Section 6.6 โดย visual locomotion ต้องปรับ playback rate ให้เท้าสัมพันธ์กับระยะเคลื่อนที่
+
+### 6.6 Talent Tree System (ใหม่ — เติม Spec ที่ Section 7.2 อ้างถึงแต่ยังไม่มีรายละเอียด)
+
+ระบบ Talent เป็นแบบ **เลือก 1 ใน 2 ต่อจุดปลดล็อก** (Binary Choice) ถาวรตลอดแมตช์ ใช้ชุดเดียวกันทุกฮีโร่ (ไม่แยกต่อฮีโร่ เพื่อลด scope):
+
+| ปลดล็อกที่ Level | ตัวเลือก A | ตัวเลือก B |
+|---|---|---|
+| Level 4 | +75 Max HP | +10% Cooldown Reduction |
+| Level 8 | +15% Attack Speed | +15% ดาเมจจากสกิลทั้งหมด |
+| Level 12 | +20% Move Speed | -10% ดาเมจที่ได้รับจากทุกแหล่ง |
+
+กด `T` เพื่อเปิดหน้าต่างเลือก Talent เมื่อถึง Level ที่ปลดล็อก (มีจุดแจ้งเตือนบน HUD เมื่อเลือกได้)
+
+### 6.7 Attribute Bonus System (ใหม่ — เติม Spec ที่ Section 7.2 อ้างถึงแต่ยังไม่มีรายละเอียด)
+
+ทุกครั้งที่ Level Up ได้รับ **Attribute Point 1 แต้ม** (แยกจาก Skill Point) นำไปลงในสถิติได้อย่างอิสระผ่านหน้าต่าง `Ctrl+U`:
+
+| ตัวเลือกลงแต้ม | ผลต่อ 1 แต้ม |
+|---|---|
+| Vitality | +2% ของ Max HP ปัจจุบัน |
+| Focus | +2% ของ Max Mana ปัจจุบัน |
+| Armor | +1 Armor |
+| Resolve | +1 Magic Resist |
+
+ลงแต้มสะสมได้ ไม่จำกัดจำนวนแต้มต่อหมวด (จำกัดแค่จำนวนแต้มรวมตาม Level ปัจจุบัน)
+
 ---
 
 ## 7. Controls & Camera — **PC-first สำหรับ 1.0.0** (ปรับปรุงล่าสุด)
@@ -264,7 +318,8 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 ### 7.1 กล้อง
 - มุมกล้องคงที่ Top-down Isometric 50 องศา
 - ระยะ Zoom: 8-14 เมตรจากพื้น (scroll wheel)
-- กล้อง follow ตัวละครผู้เล่นแบบ soft-lerp พร้อม look-ahead เล็กน้อยตามทิศทางเคลื่อนที่
+- กล้องมีสองสถานะ: FREE สำหรับ Edge Pan/เลื่อนดูแผนที่ และ LOCKED สำหรับ follow ตัวละครแบบ soft-lerp พร้อม look-ahead
+- กด Y หรือปุ่มสถานะบน HUD เพื่อสลับ FREE/LOCKED; กด Space สั้นเพื่อ Focus และกดค้างเพื่อ Lock ชั่วคราว
 
 ### 7.2 PC Control Scheme (Scope จริงของ 1.0.0)
 - **เคลื่อนที่:** Right-click (Click-to-move) มาตรฐาน Inspire MOBA
@@ -280,6 +335,8 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
   - **1–6:** ใช้งาน Active Items ในช่อง Inventory (6 ช่อง)
   - **P:** สลับเปิด/ปิดร้านค้า (เมื่ออยู่ใน Fountain Zone ตาม Section 5.1)
   - **T:** เปิดหน้าต่าง Talent Tree (เลเวล 4, 8, 12)
+  - **F1:** เปิด/ปิด Hero Profile ที่แสดง Model, Role, Lore, Passive และรายละเอียด Q/W/E/R
+- อินพุตเมาส์ที่อยู่บน HUD/Modal ต้องถูก consume โดย Presentation และห้ามทะลุไปเป็นคำสั่งเลือกเป้าหมายหรือเดิน
 
 ### 7.3 Mobile Control Scheme (เลื่อนไป Version 1.1.0 — เก็บ Spec ไว้ล่วงหน้า)
 - **เคลื่อนที่:** Virtual Joystick มุมซ้ายล่าง
@@ -296,7 +353,11 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 - แถบ Gold/Level/EXP มุมบนหน้าจอ
 - Kill Feed แบบเรียบง่าย (ข้อความ "You / Enemy destroyed [Tower]" หรือ "You / Enemy has been slain")
 - Low-HP Vignette Warning เมื่อ HP ต่ำกว่า 25%
-- **ไม่ต้องมี Minimap** ใน 1.0.0 (แผนที่เลนเดียวมองเห็นได้ทั้งหมดในมุมกล้องอยู่แล้ว)
+- **Mini Map มุมซ้ายบน:** แสดงขอบสนาม, เลน, Fountain, Tower, Nexus, ครีป และฮีโร่ โดยตำแหน่งศัตรูต้องเคารพกฎ Vision/Brush ตาม Section 3.1 และ Section 8
+- Mini Map ต้องมีปุ่มย่อ/ขยาย, คลิกซ้ายเพื่อเลื่อนกล้อง และคลิกขวาเพื่อส่งคำสั่งเดินไปยังตำแหน่งที่แปลงกลับเป็น world-space ภายใน Arena Bounds
+- แผง Hero & Bot Controls ต้องย่อ/ขยายได้ และมีปุ่ม/ข้อความสถานะกล้อง FREE/LOCKED
+- Hover Q/W/E/R ต้องแสดง Tooltip ที่มีชื่อสกิล, Mana Cost, Base Cooldown และคำอธิบายผลเต็ม
+- กด F1 ต้องเปิด Hero Profile ตาม Section 7.2 โดยมีภาพ Model แบบ render สด, Lore, Role, Passive และรายละเอียด Q/W/E/R
 
 ---
 
@@ -331,11 +392,13 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 ## 11. Acceptance Criteria — Phase-01 (1.0.0) ถือว่า "เสร็จ" เมื่อ
 
 1. ผู้เล่นเริ่มแมตช์ 1v1 กับ AI Bot ได้ครบ 3 ระดับความยาก (Easy/Medium/Hard) ตั้งแต่ Spawn จนถึงหน้าจอชนะ/แพ้
-2. ฮีโร่ทั้ง 4 ตัวมีสกิลครบ 4 ท่าทำงานถูกต้องตามค่าที่ระบุใน Section 6
+2. ฮีโร่ทั้ง 4 ตัวมีสกิลครบ **4 ท่า (Q/W/E/R) + Passive** ทำงานถูกต้องตามค่าที่ระบุใน Section 6.1-6.4
 3. ระบบร้านค้าซื้อ/ขายไอเทมได้ สถิติเปลี่ยนแปลงถูกต้องแบบ real-time
-4. Input ทำงานถูกต้องทั้งบน PC build และ Android build ขั้นต่ำ 1 เครื่อง
-5. รักษาเฟรมเรตอย่างน้อย 30 FPS บนสเปกขั้นต่ำ (ตาม Section device_specs_config เดิม) และ 60 FPS บนสเปกแนะนำ
-6. แมตช์ทดสอบต่อเนื่อง 20 นาทีไม่มี Critical Crash
+4. **ระบบ Talent Tree (Section 6.6) เลือกได้ที่ Level 4/8/12 และ Attribute Bonus (Section 6.7) ลงแต้มได้ทุกครั้งที่ Level Up ผลลัพธ์ตรงตามสเปก**
+5. **Tower Escalation System (Section 3.2) เกิด Cannon Minion และ Super Creep ถูกต้องเมื่อทำลายป้อมแต่ละ Tier**
+6. Input ทำงานถูกต้องทั้งบน PC build ขั้นต่ำ 1 เครื่อง (Mobile เลื่อนไป 1.1.0)
+7. รักษาเฟรมเรตอย่างน้อย 30 FPS บนสเปกขั้นต่ำ (ตาม Section device_specs_config เดิม) และ 60 FPS บนสเปกแนะนำ
+8. แมตช์ทดสอบต่อเนื่อง 20 นาทีไม่มี Critical Crash
 
 ---
 
@@ -348,8 +411,17 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 - Item Recipe/Crafting ต่อกัน
 - Networking/Matchmaking (Cloudflare/Supabase) — ยังคงอยู่ใน Phase-02/03 ตามเดิม
 - Monetization (ยังไม่ได้คุยในรอบนี้ — แนะนำให้หยิบมาคุยก่อนเริ่ม Phase-03)
-- Minimap
 - Pick/Ban Phase (ไม่จำเป็นสำหรับ 1v1 กับ AI)
+
+### 12.1 Ranked 5v5 Economy & Vision — Future Specification (ยังไม่อนุมัติให้ลง 1v1)
+
+รายการต่อไปนี้เป็นข้อกำหนดเบื้องต้นสำหรับ **Ranked 5v5 เท่านั้น** และต้องผ่าน Design/Balance Review แยกก่อน implementation:
+
+- **Secret Shop:** อยู่ในพื้นที่เสี่ยงบนแผนที่ Ranked 5v5; สินค้าหมวด Secret Shop ซื้อจาก Fountain/Base Shop ไม่ได้ และไม่ปรากฏใน 5v5 Normal
+- **Ward System:** มีไอเทมตรวจการณ์แบบมองเห็นพื้นที่และแบบตรวจจับสิ่งพรางตัว กำหนดจำนวนคงคลัง, cooldown การเติม, ระยะ vision, อายุ และกฎการทำลายแยกจาก 1v1
+- **Tree-consume Healing:** Consumable สำหรับใช้กับต้นไม้ที่ถูกต้องตามชนิดในแผนที่ เพื่อฟื้น HP แบบต่อเนื่อง; การใช้ต้องยกเลิกเมื่อรับความเสียหายตามค่าที่ Balance Review อนุมัติ
+- **Gold Buyback:** ผู้เล่นที่ตายใน Ranked 5v5 สามารถจ่ายทองเพื่อเกิดใหม่ได้เมื่อผ่านสูตรราคาและ cooldown; ระบบต้องมี confirmation, แสดงราคาก่อนซื้อ และบันทึก telemetry เพื่อป้องกันการกดผิด
+- ระบบทั้งสี่ต้องอยู่หลัง Mode Rule Set/feature flag ห้ามทำให้ catalog, economy หรือ respawn ของ Version 1.0.0 แบบ 1v1 เปลี่ยนตามโดยอัตโนมัติ
 
 ---
 

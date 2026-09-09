@@ -49,7 +49,7 @@ namespace KOA.Core.Match
         public event Action<TowerEntity> OnTowerDestroyed;
         public event Action<string> OnKillFeedMessage;
 
-        // ตำแหน่ง Fountain Zone (Section 3.1: รัศมี 7.5m, HP/Mana Regen ~11%/sec แบบ LoL)
+        // ตำแหน่ง Fountain Zone (Section 3.1: รัศมี 7.5m, HP/Mana Regen ~11%/sec ตาม MOBA Standard)
         public Vector3 BlueFountainPos { get; private set; }
         public Vector3 RedFountainPos { get; private set; }
         public const float FountainZoneRadius = 7.5f;
@@ -199,7 +199,7 @@ namespace KOA.Core.Match
             UpdateTowerCombat(BlueTowers, 1);
             UpdateTowerCombat(RedTowers, 0);
 
-            // 3. Fountain Zone HP/Mana Regen (Section 3.1: 20% MaxHP/sec)
+            // 3. Fountain Zone HP/Mana Regen (Section 3.1: ~11% MaxHP/MaxMana per second)
             UpdateFountainZoneRegen(deltaTime);
 
             // 4. Minion Combat & Movement Loop (Section 3.2)

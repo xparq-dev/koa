@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -7,7 +8,7 @@ namespace KOA.Presentation.Camera
 {
     /// <summary>
     /// ระบบกล้อง Top-down Isometric 50 องศา ตาม Section 7.1
-    /// รองรับ Zoom 8-14m และ Soft-lerp พร้อม Look-ahead
+    /// รองรับ Zoom 8-14m, Free Camera, Edge Pan และ Focus/Lock
     /// รองรับทั้ง New Input System และ Legacy Input Manager
     /// </summary>
     public class TopDownCameraController : MonoBehaviour
@@ -22,57 +23,257 @@ namespace KOA.Presentation.Camera
         [SerializeField] private float yawAngle = 0.0f;
 
         [Header("Zoom Settings (Section 7.1: 8 - 14 meters)")]
-        [SerializeField] private float currentDistance = 11.0f;
+        [SerializeField] private float currentDistance = 11.5f;
         [SerializeField] private float minDistance = 8.0f;
         [SerializeField] private float maxDistance = 14.0f;
         [SerializeField] private float zoomSpeed = 4.0f;
 
+        [Header("Free Camera Controls")]
+        [SerializeField] private bool startPermanentlyLocked;
+        [SerializeField] private float edgePanBorderPixels = 14.0f;
+        [SerializeField] private float edgePanSpeed = 17.0f;
+        [SerializeField] private Vector2 horizontalFocusBounds = new Vector2(-11.5f, 11.5f);
+        [SerializeField] private Vector2 laneFocusBounds = new Vector2(-62.0f, 62.0f);
+
+        [Header("Focus Controls")]
+        [SerializeField] private float holdThresholdSeconds = 0.22f;
+        [SerializeField] private float repeatedTapWindowSeconds = 0.55f;
+
+        [Header("Depth Precision")]
+        [SerializeField] private float nearClipPlane = 0.2f;
+        [SerializeField] private float farClipPlane = 180.0f;
+
         private Vector3 _lastTargetPos;
         private Vector3 _targetVelocity;
+        private Vector3 _cameraFocusPoint;
+        private readonly List<Transform> _focusTargets = new List<Transform>();
+        private int _focusTargetIndex;
+        private bool _hasFocusPoint;
+        private bool _persistentLock;
+        private bool _spaceHeld;
+        private float _spacePressedAt;
+        private float _lastQuickTapAt = -10f;
+
+        public bool IsLocked => _persistentLock || _spaceHeld;
+        public bool IsPermanentlyLocked => _persistentLock;
+
+        public void TogglePersistentLock()
+        {
+            _persistentLock = !_persistentLock;
+            if (_persistentLock) FocusPrimaryTarget();
+        }
+
+        public void PanToWorldPosition(Vector3 worldPosition)
+        {
+            _persistentLock = false;
+            _spaceHeld = false;
+            _cameraFocusPoint = worldPosition;
+            _cameraFocusPoint.y = 0f;
+            _hasFocusPoint = true;
+            ClampFocusPoint();
+        }
 
         public void SetTarget(Transform newTarget)
         {
             target = newTarget;
+            _focusTargets.Clear();
+            _focusTargetIndex = 0;
             if (target != null)
             {
+                _focusTargets.Add(target);
                 _lastTargetPos = target.position;
+                FocusOnTarget();
             }
+        }
+
+        /// <summary>
+        /// Future-ready hook for team modes. Repeated quick Space taps cycle registered focus targets.
+        /// </summary>
+        public void RegisterFocusTarget(Transform focusTarget)
+        {
+            if (focusTarget != null && !_focusTargets.Contains(focusTarget))
+                _focusTargets.Add(focusTarget);
         }
 
         private void Start()
         {
+            UnityEngine.Camera controlledCamera = GetComponent<UnityEngine.Camera>();
+            if (controlledCamera != null)
+            {
+                controlledCamera.nearClipPlane = nearClipPlane;
+                controlledCamera.farClipPlane = farClipPlane;
+            }
+
+            _persistentLock = startPermanentlyLocked;
             if (target != null)
             {
                 _lastTargetPos = target.position;
+                FocusOnTarget();
             }
+
+            ApplyCameraTransform(true);
         }
 
         private void Update()
         {
             HandleZoomInput();
+            HandleFocusInput();
+            if (!IsLocked)
+                HandleEdgePanInput();
         }
 
         private void LateUpdate()
         {
-            if (target == null) return;
-
-            // คำนวณความเร็วเป้าหมายเพื่อทำ Look-ahead เล็กน้อย
-            if (Time.deltaTime > 0f)
+            if (IsLocked && target != null)
             {
-                Vector3 currentVelocity = (target.position - _lastTargetPos) / Time.deltaTime;
-                _targetVelocity = Vector3.Lerp(_targetVelocity, currentVelocity, Time.deltaTime * 5f);
-                _lastTargetPos = target.position;
+                if (Time.deltaTime > 0f)
+                {
+                    Vector3 currentVelocity = (target.position - _lastTargetPos) / Time.deltaTime;
+                    _targetVelocity = Vector3.Lerp(_targetVelocity, currentVelocity, Time.deltaTime * 5f);
+                    _lastTargetPos = target.position;
+                }
+
+                Vector3 lookAhead = _targetVelocity.normalized * Mathf.Min(_targetVelocity.magnitude * 0.15f, lookAheadFactor);
+                Vector3 desiredFocus = target.position + lookAhead;
+                float followBlend = 1f - Mathf.Exp(-smoothSpeed * Time.deltaTime);
+                _cameraFocusPoint = Vector3.Lerp(_cameraFocusPoint, desiredFocus, followBlend);
             }
 
-            Vector3 focusPoint = target.position + (_targetVelocity.normalized * Mathf.Min(_targetVelocity.magnitude * 0.15f, lookAheadFactor));
+            ClampFocusPoint();
+            ApplyCameraTransform(false);
+        }
 
-            // คำนวณตำแหน่งกล้องตามมุม Pitch 50 องศา และระยะ Distance
+        private void HandleFocusInput()
+        {
+            bool spaceDown;
+            bool spacePressed;
+            bool spaceUp;
+            bool toggleLockDown;
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+            {
+                spaceDown = Keyboard.current.spaceKey.wasPressedThisFrame;
+                spacePressed = Keyboard.current.spaceKey.isPressed;
+                spaceUp = Keyboard.current.spaceKey.wasReleasedThisFrame;
+                toggleLockDown = Keyboard.current.yKey.wasPressedThisFrame;
+            }
+            else
+#endif
+            {
+                spaceDown = UnityEngine.Input.GetKeyDown(KeyCode.Space);
+                spacePressed = UnityEngine.Input.GetKey(KeyCode.Space);
+                spaceUp = UnityEngine.Input.GetKeyUp(KeyCode.Space);
+                toggleLockDown = UnityEngine.Input.GetKeyDown(KeyCode.Y);
+            }
+
+            if (toggleLockDown)
+            {
+                TogglePersistentLock();
+            }
+
+            if (spaceDown)
+            {
+                _spacePressedAt = Time.unscaledTime;
+                _spaceHeld = true;
+                FocusOnTarget();
+            }
+            else if (spacePressed)
+            {
+                _spaceHeld = true;
+            }
+
+            if (spaceUp)
+            {
+                float heldDuration = Time.unscaledTime - _spacePressedAt;
+                _spaceHeld = false;
+                if (heldDuration <= holdThresholdSeconds)
+                {
+                    CycleFocusTargetForQuickTap();
+                    FocusOnTarget();
+                }
+            }
+        }
+
+        private void HandleEdgePanInput()
+        {
+            if (!Application.isFocused) return;
+
+            Vector2 mousePosition;
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null)
+                mousePosition = Mouse.current.position.ReadValue();
+            else
+#endif
+                mousePosition = UnityEngine.Input.mousePosition;
+
+            Vector3 direction = Vector3.zero;
+            if (mousePosition.x <= edgePanBorderPixels) direction.x -= 1f;
+            else if (mousePosition.x >= Screen.width - edgePanBorderPixels) direction.x += 1f;
+            if (mousePosition.y <= edgePanBorderPixels) direction.z -= 1f;
+            else if (mousePosition.y >= Screen.height - edgePanBorderPixels) direction.z += 1f;
+
+            if (direction.sqrMagnitude > 1f) direction.Normalize();
+            if (direction.sqrMagnitude > 0f)
+            {
+                float distanceScale = Mathf.Lerp(0.82f, 1.18f, Mathf.InverseLerp(minDistance, maxDistance, currentDistance));
+                _cameraFocusPoint += direction * (edgePanSpeed * distanceScale * Time.unscaledDeltaTime);
+                ClampFocusPoint();
+            }
+        }
+
+        private void CycleFocusTargetForQuickTap()
+        {
+            _focusTargets.RemoveAll(item => item == null);
+            if (_focusTargets.Count == 0) return;
+
+            if (Time.unscaledTime - _lastQuickTapAt <= repeatedTapWindowSeconds && _focusTargets.Count > 1)
+                _focusTargetIndex = (_focusTargetIndex + 1) % _focusTargets.Count;
+            else
+                _focusTargetIndex = 0;
+
+            target = _focusTargets[_focusTargetIndex];
+            _lastQuickTapAt = Time.unscaledTime;
+        }
+
+        private void FocusPrimaryTarget()
+        {
+            _focusTargets.RemoveAll(item => item == null);
+            if (_focusTargets.Count > 0)
+            {
+                _focusTargetIndex = 0;
+                target = _focusTargets[0];
+            }
+            FocusOnTarget();
+        }
+
+        private void FocusOnTarget()
+        {
+            if (target == null) return;
+            _cameraFocusPoint = target.position;
+            _lastTargetPos = target.position;
+            _targetVelocity = Vector3.zero;
+            _hasFocusPoint = true;
+            ClampFocusPoint();
+        }
+
+        private void ClampFocusPoint()
+        {
+            if (!_hasFocusPoint) return;
+            _cameraFocusPoint.x = Mathf.Clamp(_cameraFocusPoint.x, horizontalFocusBounds.x, horizontalFocusBounds.y);
+            _cameraFocusPoint.y = Mathf.Clamp(_cameraFocusPoint.y, 0f, 2f);
+            _cameraFocusPoint.z = Mathf.Clamp(_cameraFocusPoint.z, laneFocusBounds.x, laneFocusBounds.y);
+        }
+
+        private void ApplyCameraTransform(bool snap)
+        {
+            if (!_hasFocusPoint) return;
+
             Quaternion rotation = Quaternion.Euler(pitchAngle, yawAngle, 0f);
             Vector3 offset = rotation * new Vector3(0, 0, -currentDistance);
-            Vector3 desiredPosition = focusPoint + offset;
+            Vector3 desiredPosition = _cameraFocusPoint + offset;
 
-            // Soft-lerp การเคลื่อนที่ของกล้อง
-            transform.position = Vector3.Lerp(transform.position, desiredPosition, Time.deltaTime * smoothSpeed);
+            float blend = snap ? 1f : 1f - Mathf.Exp(-smoothSpeed * Time.deltaTime);
+            transform.position = Vector3.Lerp(transform.position, desiredPosition, blend);
             transform.rotation = rotation;
         }
 

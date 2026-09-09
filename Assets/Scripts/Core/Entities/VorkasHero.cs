@@ -49,7 +49,6 @@ namespace KOA.Core.Entities
 
         // Events สำหรับ Presentation Layer (Visuals / SFX / UI)
         public event Action<Vector3> OnDestinationSet;
-        public event Action<Vector3> OnBasicAttackExecuted;
         public event Action<Vector3, Vector3, bool> OnIronCleaveExecuted; // startPos, endPos, isHit
         public event Action<float, float> OnSkill1CooldownUpdated;
         public event Action OnVanguardsWillExecuted;
@@ -64,7 +63,7 @@ namespace KOA.Core.Entities
             baseArmor: 38f,
             baseMr: 32f,
             baseAd: 54f,
-            baseSpeed: 7.2f,
+            baseSpeed: 4.4f,
             attackRange: 2.2f,
             statGrowth: HeroStatGrowth.GetGrowthFor("Vorkas")
         )
@@ -78,8 +77,7 @@ namespace KOA.Core.Entities
         /// </summary>
         public override void SetMoveDestination(Vector3 destination)
         {
-            destination.y = Position.y; // ล็อกแกน Y ให้อยู่บนระนาบสนาม
-            TargetDestination = destination;
+            TargetDestination = ClampMoveDestination(destination);
             IsMoving = true;
             OnDestinationSet?.Invoke(TargetDestination);
         }
@@ -98,7 +96,7 @@ namespace KOA.Core.Entities
         /// </summary>
         public override bool TryBasicAttack(ITargetable target)
         {
-            if (!IsAlive || target == null || !target.IsAlive) return false;
+            if (!CanPerformActions || target == null || !target.IsAlive) return false;
             if (target.TeamId == TeamId && target.TeamId != -1) return false; // ไม่ตีพวกเดียวกัน
             if (AttackCooldownRemaining > 0f) return false;
 
@@ -118,7 +116,7 @@ namespace KOA.Core.Entities
             // คำนวณดาเมจ
             target.TakeDamage(EffectiveAttackDamage, DamageType.Physical, HeroId);
             AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
-            OnBasicAttackExecuted?.Invoke(target.Position);
+            InvokeBasicAttackExecuted(target.Position);
             return true;
         }
 
@@ -133,7 +131,7 @@ namespace KOA.Core.Entities
             if (!IsAlive || Skill1Rank <= 0 || Skill1CooldownRemaining > 0f) return false;
             // หักมานาและตั้งคูลดาวน์
             if (!TryConsumeMana(Skill1ManaCost)) return false;
-            float cd = Mathf.Max(5.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 0.5f);
+            float cd = ApplyAbilityCooldownReduction(Mathf.Max(5.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 0.5f));
             Skill1CooldownRemaining = cd;
             OnSkill1CooldownUpdated?.Invoke(Skill1CooldownRemaining, cd);
 
@@ -155,8 +153,8 @@ namespace KOA.Core.Entities
             bool hit = false;
             // Inspire MOBA: Rank 1: 75, Rank 2: 125, Rank 3: 175, Rank 4: 225
             float baseDmg = 75f + (Skill1Rank - 1) * 50f;
-            float adRatio = 0.7f + (Skill1Rank - 1) * 0.1f;
-            float damage = baseDmg + (EffectiveAttackDamage * adRatio);
+            float adRatio = 0.80f;
+            float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * adRatio));
 
             if (targets != null)
             {
@@ -189,7 +187,7 @@ namespace KOA.Core.Entities
             if (!IsAlive || Skill2Rank <= 0 || Skill2CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill2ManaCost)) return false;
 
-            float cd = Mathf.Max(9.0f, Skill2CooldownDuration - (Skill2Rank - 1) * 1.0f);
+            float cd = ApplyAbilityCooldownReduction(Mathf.Max(9.0f, Skill2CooldownDuration - (Skill2Rank - 1) * 1.0f));
             Skill2CooldownRemaining = cd;
             Skill2ActiveTimer = Skill2Duration;
             CurrentShield = 100f + (Skill2Rank - 1) * 60f;
@@ -207,13 +205,13 @@ namespace KOA.Core.Entities
             if (!IsAlive || Skill3Rank <= 0 || Skill3CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill3ManaCost)) return false;
 
-            float cd = Mathf.Max(6.0f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f);
+            float cd = ApplyAbilityCooldownReduction(Mathf.Max(6.0f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f));
             Skill3CooldownRemaining = cd;
 
             Vector3 center = Position; // Self-AoE slam centered on Vorkas
             bool hit = false;
             float baseDmg = 80f + (Skill3Rank - 1) * 50f;
-            float damage = baseDmg + (EffectiveAttackDamage * 0.60f);
+            float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.60f));
 
             if (targets != null)
             {
@@ -226,6 +224,8 @@ namespace KOA.Core.Entities
                         {
                             hit = true;
                             t.TakeDamage(damage, DamageType.Physical, HeroId);
+                            if (t is HeroBase3D heroTarget)
+                                heroTarget.ApplyMovementSlow(0.40f, 2.5f);
                         }
                     }
                 }
@@ -246,7 +246,7 @@ namespace KOA.Core.Entities
             if (!IsAlive || UltimateRank <= 0 || UltimateCooldownRemaining > 0f) return false;
             if (!TryConsumeMana(UltimateManaCost)) return false;
 
-            float cd = Mathf.Max(60.0f, UltimateCooldownDuration - (UltimateRank - 1) * 10.0f);
+            float cd = ApplyAbilityCooldownReduction(Mathf.Max(60.0f, UltimateCooldownDuration - (UltimateRank - 1) * 10.0f));
             UltimateCooldownRemaining = cd;
 
             Vector3 toAim = aimWorldPos - Position;
@@ -257,7 +257,7 @@ namespace KOA.Core.Entities
 
             bool hit = false;
             float baseDmg = 250f + (UltimateRank - 1) * 125f;
-            float damage = baseDmg + (EffectiveAttackDamage * 1.20f);
+            float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 1.20f));
 
             if (targets != null)
             {
@@ -270,6 +270,8 @@ namespace KOA.Core.Entities
                         {
                             hit = true;
                             t.TakeDamage(damage, DamageType.Physical, HeroId);
+                            if (t is HeroBase3D heroTarget)
+                                heroTarget.ApplyStun(1.0f);
                         }
                     }
                 }
@@ -283,6 +285,10 @@ namespace KOA.Core.Entities
 
         public override void TakeDamage(float rawDamage, DamageType damageType, string attackerId = null)
         {
+            if (!IsAlive || IsInvulnerable) return;
+            if (damageType == DamageType.Magic)
+                rawDamage *= 0.85f; // Passive Anti-Energy Aura: ลด Magic Damage 15% (Section 6.1)
+
             if (CurrentShield > 0f)
             {
                 if (CurrentShield >= rawDamage)
@@ -305,6 +311,7 @@ namespace KOA.Core.Entities
         /// </summary>
         public override void SimulationTick(float deltaTime)
         {
+            TickSharedSystems(deltaTime);
             if (!IsAlive) return;
 
             // นับถอยหลังคูลดาวน์สกิล 1-3 & Ultimate
@@ -337,6 +344,8 @@ namespace KOA.Core.Entities
             {
                 AttackCooldownRemaining = Mathf.Max(0f, AttackCooldownRemaining - deltaTime);
             }
+
+            if (IsStunned) return;
 
             // ประมวลผลการเดิน Click-to-move
             if (IsMoving)

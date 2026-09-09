@@ -33,6 +33,17 @@ namespace KOA.Presentation.UI
             _targetTransform = target;
         }
 
+        public void SetOffset(Vector3 worldOffset)
+        {
+            offset = worldOffset;
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (gameObject.activeSelf != visible)
+                gameObject.SetActive(visible);
+        }
+
         public void SetupScaleBar(Transform fillBarTransform)
         {
             fillScaleBar = fillBarTransform;

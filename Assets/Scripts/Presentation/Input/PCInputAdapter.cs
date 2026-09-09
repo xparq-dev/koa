@@ -82,6 +82,7 @@ namespace KOA.Presentation.Input
             else
             {
                 HoveredCollider = null;
+                HoveredPoint = Vector3.zero;
             }
 
             Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
@@ -99,31 +100,29 @@ namespace KOA.Presentation.Input
         {
             // คลิกขวาเดิน (Click-to-move ตาม Section 7.2) หรือสั่งโจมตี
             bool isRightDown = false;
-            bool isRightHeld = false;
 #if ENABLE_INPUT_SYSTEM
             if (Mouse.current != null)
             {
                 isRightDown = Mouse.current.rightButton.wasPressedThisFrame;
-                isRightHeld = Mouse.current.rightButton.isPressed;
             }
             else
 #endif
             {
                 isRightDown = UnityEngine.Input.GetMouseButtonDown(1);
-                isRightHeld = UnityEngine.Input.GetMouseButton(1);
             }
 
             RightClickDown = isRightDown;
 
             if (isRightDown)
             {
+                if (KOA.Presentation.UI.MatchHUD.IsPointerOverAnyHud(GetPointerScreenPosition()))
+                {
+                    RightClickDown = false;
+                    return;
+                }
                 _rightClickPending = true;
                 _rightClickedCollider = HoveredCollider;
                 _rightClickedPoint = HoveredPoint != Vector3.zero ? HoveredPoint : _currentInput.AimVector;
-            }
-
-            if (isRightDown || isRightHeld)
-            {
                 _currentInput.HasMoveTarget = true;
                 _currentInput.TargetDestination = _currentInput.AimVector;
             }
@@ -182,9 +181,16 @@ namespace KOA.Presentation.Input
 
             if (leftDown)
             {
-                _leftClickPending = true;
-                _leftClickedCollider = HoveredCollider;
-                _leftClickedPoint = HoveredPoint != Vector3.zero ? HoveredPoint : _currentInput.AimVector;
+                if (!KOA.Presentation.UI.MatchHUD.IsPointerOverAnyHud(GetPointerScreenPosition()))
+                {
+                    _leftClickPending = true;
+                    _leftClickedCollider = HoveredCollider;
+                    _leftClickedPoint = HoveredPoint != Vector3.zero ? HoveredPoint : _currentInput.AimVector;
+                }
+                else
+                {
+                    LeftClickDown = false;
+                }
             }
 
             // ถ้ากด Ctrl ค้างอยู่ (กำลังเลเวลอัปสกิล) จะไม่สั่งร่ายสกิล
@@ -220,6 +226,14 @@ namespace KOA.Presentation.Input
             bool wasPending = _leftClickPending;
             _leftClickPending = false;
             return wasPending;
+        }
+
+        private static Vector2 GetPointerScreenPosition()
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null) return Mouse.current.position.ReadValue();
+#endif
+            return UnityEngine.Input.mousePosition;
         }
 
         public bool ConsumeRightClick(out Collider clickedCollider, out Vector3 clickedPoint)

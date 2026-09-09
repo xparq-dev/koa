@@ -1,5 +1,7 @@
 using KOA.Data.Enums;
+using KOA.Core.World;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace KOA.Core.Entities
@@ -36,6 +38,7 @@ namespace KOA.Core.Entities
     public abstract class HeroBase3D : ITargetable
     {
         public const int MaxLevel = 12; // Level Cap สำหรับ 1.0.0 (Section 2.2)
+        public const float PassiveManaRegenerationPercentPerSecond = 0.0125f;
 
         // ข้อมูลระบุตัวตนและ ITargetable
         public string HeroId { get; protected set; }
@@ -65,7 +68,12 @@ namespace KOA.Core.Entities
         // สถานะปัจจุบันใน Simulation Core
         public float CurrentHp { get; protected set; }
         public float CurrentMana { get; protected set; }
-        public Vector3 Position { get; set; }
+        private Vector3 _position;
+        public Vector3 Position
+        {
+            get => _position;
+            set => _position = ArenaBounds.Clamp(value, Radius);
+        }
         public Quaternion Rotation { get; set; } = Quaternion.identity;
         public bool IsAlive => CurrentHp > 0f;
         public bool IsMoving { get; protected set; }
@@ -74,33 +82,68 @@ namespace KOA.Core.Entities
         // ระบบช่องเก็บของ 6 ช่อง (Section 5.1)
         public KOA.Core.Items.Inventory Inventory { get; } = new KOA.Core.Items.Inventory();
 
-        // ระบบแต้มสกิลและระดับสกิลสไตล์ DOTA 2
+        // ระบบแต้มสกิลและระดับสกิลตาม MOBA Standard
         public int AvailableSkillPoints { get; protected set; } = 1;
         public int Skill1Rank { get; protected set; } = 0; // Max 4 (Q)
         public int Skill2Rank { get; protected set; } = 0; // Max 4 (W)
         public int Skill3Rank { get; protected set; } = 0; // Max 4 (E)
         public int UltimateRank { get; protected set; } = 0; // Max 3 (R - Unlocks at Lv 6, 10, 12)
-        public int StatBonusRank { get; protected set; } = 0; // Max 4 (+All Attributes)
+        public int AvailableAttributePoints { get; protected set; }
+        public int VitalityPoints { get; protected set; }
+        public int FocusPoints { get; protected set; }
+        public int ArmorPoints { get; protected set; }
+        public int ResolvePoints { get; protected set; }
 
         // Talent Tree (Lv 4, 8, 12) (-1 = Unchosen, 0 = Option A, 1 = Option B)
-        public int TalentTier1Choice { get; protected set; } = -1; // Lv 4: 0 = +15% AtkSpeed, 1 = +150 Max HP
-        public int TalentTier2Choice { get; protected set; } = -1; // Lv 8: 0 = 15% CDR, 1 = +25 Base AD
-        public int TalentTier3Choice { get; protected set; } = -1; // Lv 12: 0 = +20% Lifesteal/Regen, 1 = +30 Armor
+        public int TalentTier1Choice { get; protected set; } = -1; // Lv 4: A +75 HP, B +10% CDR
+        public int TalentTier2Choice { get; protected set; } = -1; // Lv 8: A +15% Attack Speed, B +15% Skill Damage
+        public int TalentTier3Choice { get; protected set; } = -1; // Lv 12: A +20% Move Speed, B -10% Damage Taken
 
-        // สถิติสุทธิหลังรวมการเติบโตต่อเลเวล, ไอเทม, Stat Bonus (+Stats), และ Talents
-        public float EffectiveMaxHp => BaseMaxHp + (StatGrowth.HpPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxHp + (StatBonusRank * 60f) + (TalentTier1Choice == 1 ? 150f : 0f);
-        public float EffectiveMaxMana => BaseMaxMana + (StatGrowth.ManaPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxMana + (StatBonusRank * 40f);
-        public float EffectiveArmor => BaseArmor + (StatGrowth.ArmorPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusArmor + (StatBonusRank * 1.5f) + (TalentTier3Choice == 1 ? 30f : 0f);
-        public float EffectiveMagicResist => BaseMagicResist + (StatGrowth.MrPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMagicResist;
-        public float EffectiveAttackDamage => BaseAttackDamage + (StatGrowth.AdPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusAttackDamage + (StatBonusRank * 3.0f) + (TalentTier2Choice == 1 ? 25f : 0f);
-        public virtual float EffectiveMoveSpeed => BaseMoveSpeed + Inventory.TotalBonusMoveSpeed;
-        public float EffectiveCooldownReduction => (TalentTier2Choice == 0 ? 0.15f : 0f) + Inventory.TotalBonusCooldownReduction;
-        /// <summary>คูลดาวน์โจมตีปกติหลังคิดรวม Attack Rate Bonus จากไอเทม (TalentTier1 +15% ด้วย) (Section 5.2)</summary>
+        // สถิติสุทธิหลังรวมการเติบโตต่อเลเวล, ไอเทม, Attribute Points และ Talents (Section 6.6-6.7)
+        private float MaxHpBeforeAttributes => BaseMaxHp + (StatGrowth.HpPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxHp + (TalentTier1Choice == 0 ? 75f : 0f);
+        private float MaxManaBeforeAttributes => BaseMaxMana + (StatGrowth.ManaPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMaxMana;
+        public float EffectiveMaxHp => MaxHpBeforeAttributes * Mathf.Pow(1.02f, VitalityPoints);
+        public float EffectiveMaxMana => MaxManaBeforeAttributes * Mathf.Pow(1.02f, FocusPoints);
+        public float ManaRegenerationPerSecond => EffectiveMaxMana * PassiveManaRegenerationPercentPerSecond;
+        public float EffectiveArmor => BaseArmor + (StatGrowth.ArmorPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusArmor + ArmorPoints;
+        public float EffectiveMagicResist => BaseMagicResist + (StatGrowth.MrPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusMagicResist + ResolvePoints;
+        public virtual float EffectiveAttackDamage => BaseAttackDamage + (StatGrowth.AdPerLevel * (CurrentLevel - 1)) + Inventory.TotalBonusAttackDamage;
+        public virtual float EffectiveMoveSpeed => (BaseMoveSpeed + Inventory.TotalBonusMoveSpeed) * (TalentTier3Choice == 0 ? 1.20f : 1f) * (1f - MovementSlowPercent);
+        public float EffectiveCooldownReduction => (TalentTier1Choice == 1 ? 0.10f : 0f) + Inventory.TotalBonusCooldownReduction;
+        /// <summary>คูลดาวน์โจมตีปกติหลังคิดรวม Attack Rate Bonus จากไอเทมและ Talent Lv 8 A (Section 5.2, 6.6)</summary>
         public float EffectiveAttackCooldownFromBase(float baseAttackCooldown)
         {
-            float rateBonus = Inventory.TotalBonusAttackRatePercent + (TalentTier1Choice == 0 ? 0.15f : 0f);
-            return baseAttackCooldown / (1f + rateBonus);
+            float rateBonus = Inventory.TotalBonusAttackRatePercent + (TalentTier2Choice == 0 ? 0.15f : 0f) + AdditionalAttackRatePercent;
+            float attackSpeedMultiplier = Mathf.Max(0.1f, (1f + rateBonus) * (1f - AttackSpeedSlowPercent));
+            return baseAttackCooldown / attackSpeedMultiplier;
         }
+
+        public float ApplyAbilityCooldownReduction(float cooldown)
+        {
+            return cooldown * (1f - Mathf.Clamp(EffectiveCooldownReduction, 0f, 0.40f));
+        }
+
+        public float EffectiveSkillDamage(float rawDamage)
+        {
+            return rawDamage * (TalentTier2Choice == 1 ? 1.15f : 1f);
+        }
+
+        // Debuff และ Crowd Control state อยู่ใน Simulation Core เพื่อให้ Item/Ability ไม่ผูกกับ View (Section 1, 5.2, 6)
+        public float MovementSlowPercent { get; private set; }
+        public float MovementSlowRemaining { get; private set; }
+        public float AttackSpeedSlowPercent { get; private set; }
+        public float AttackSpeedSlowRemaining { get; private set; }
+        public float StunRemaining { get; private set; }
+        public float CrowdControlImmunityRemaining { get; private set; }
+        public float InvulnerabilityRemaining { get; private set; }
+        public bool IsStunned => StunRemaining > 0f;
+        public bool IsCrowdControlImmune => CrowdControlImmunityRemaining > 0f;
+        public bool IsInvulnerable => InvulnerabilityRemaining > 0f;
+        public bool CanPerformActions => IsAlive && !IsStunned;
+        public bool HasDebuff => MovementSlowRemaining > 0f || AttackSpeedSlowRemaining > 0f || StunRemaining > 0f || _armorShredByAttacker.Count > 0;
+        protected virtual float AdditionalAttackRatePercent => 0f;
+
+        private readonly Dictionary<string, float> _armorShredByAttacker = new Dictionary<string, float>();
 
         // ค่าสถานะ Fountain Zone
         public bool IsInFountainZone { get; set; } = false;
@@ -111,9 +154,16 @@ namespace KOA.Core.Entities
         public event Action<float, float> OnExpChanged;
         public event Action<int> OnLevelUp;
         public event Action<int> OnSkillPointsChanged;
+        public event Action<int> OnAttributePointsChanged;
         public event Action OnSkillProgressionChanged;
+        public event Action<Vector3> OnBasicAttackExecuted;
         public event Action OnDied;
         public event Action OnRespawned;
+
+        protected void InvokeBasicAttackExecuted(Vector3 targetPosition)
+        {
+            OnBasicAttackExecuted?.Invoke(targetPosition);
+        }
 
         protected void InvokeHealthChanged()
         {
@@ -127,6 +177,7 @@ namespace KOA.Core.Entities
 
         public bool TryConsumeMana(float cost)
         {
+            if (!CanPerformActions) return false;
             if (CurrentMana < cost) return false;
             CurrentMana -= cost;
             InvokeManaChanged();
@@ -140,7 +191,7 @@ namespace KOA.Core.Entities
         }
 
         /// <summary>
-        /// เรียกทุก Tick ขณะอยู่ใน Fountain Zone: ฟื้น HP/Mana ~11% MaxHP-MaxMana ต่อวินาที (ประมาณ 8-10 วิเต็มหลอด แบบ LoL)
+        /// เรียกทุก Tick ขณะอยู่ใน Fountain Zone: ฟื้น HP/Mana ~11% MaxHP-MaxMana ต่อวินาที (ประมาณ 8-10 วิเต็มหลอดตาม MOBA Standard)
         /// </summary>
         public void FountainZoneTick(float deltaTime)
         {
@@ -160,14 +211,13 @@ namespace KOA.Core.Entities
         }
 
         // ==========================================
-        // DOTA 2 SKILL PROGRESSION & TALENT METHODS
+        // MOBA STANDARD SKILL PROGRESSION & TALENTS
         // ==========================================
 
         public bool CanLevelSkill1() => AvailableSkillPoints > 0 && Skill1Rank < 4;
         public bool CanLevelSkill2() => AvailableSkillPoints > 0 && Skill2Rank < 4;
         public bool CanLevelSkill3() => AvailableSkillPoints > 0 && Skill3Rank < 4;
         public bool CanLevelUltimate() => AvailableSkillPoints > 0 && UltimateRank < 3 && ((UltimateRank == 0 && CurrentLevel >= 6) || (UltimateRank == 1 && CurrentLevel >= 10) || (UltimateRank == 2 && CurrentLevel >= 12));
-        public bool CanLevelStatBonus() => AvailableSkillPoints > 0 && StatBonusRank < 4;
 
         public bool TryLevelSkill1()
         {
@@ -202,7 +252,7 @@ namespace KOA.Core.Entities
         public bool TryLevelUltimate()
         {
             if (AvailableSkillPoints <= 0 || UltimateRank >= 3) return false;
-            // DOTA Style: Ultimate unlocks at Level 6, 10, 12
+            // MOBA Standard: Ultimate unlocks at Level 6, 10, 12
             if (UltimateRank == 0 && CurrentLevel < 6) return false;
             if (UltimateRank == 1 && CurrentLevel < 10) return false;
             if (UltimateRank == 2 && CurrentLevel < 12) return false;
@@ -214,16 +264,36 @@ namespace KOA.Core.Entities
             return true;
         }
 
-        public bool TryLevelStatBonus()
+        public bool TrySpendAttributePoint(HeroAttribute attribute)
         {
-            if (AvailableSkillPoints <= 0 || StatBonusRank >= 4) return false;
-            StatBonusRank++;
-            AvailableSkillPoints--;
-            CurrentHp += 60f;
-            CurrentMana += 40f;
+            if (AvailableAttributePoints <= 0) return false;
+
+            float previousMaxHp = EffectiveMaxHp;
+            float previousMaxMana = EffectiveMaxMana;
+            switch (attribute)
+            {
+                case HeroAttribute.Vitality:
+                    VitalityPoints++;
+                    break;
+                case HeroAttribute.Focus:
+                    FocusPoints++;
+                    break;
+                case HeroAttribute.Armor:
+                    ArmorPoints++;
+                    break;
+                case HeroAttribute.Resolve:
+                    ResolvePoints++;
+                    break;
+                default:
+                    return false;
+            }
+
+            AvailableAttributePoints--;
+            CurrentHp += EffectiveMaxHp - previousMaxHp;
+            CurrentMana += EffectiveMaxMana - previousMaxMana;
             InvokeHealthChanged();
             InvokeManaChanged();
-            OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnAttributePointsChanged?.Invoke(AvailableAttributePoints);
             OnSkillProgressionChanged?.Invoke();
             return true;
         }
@@ -233,8 +303,9 @@ namespace KOA.Core.Entities
             if (optionIndex < 0 || optionIndex > 1) return false;
             if (tier == 1 && CurrentLevel >= 4 && TalentTier1Choice == -1)
             {
+                float previousMaxHp = EffectiveMaxHp;
                 TalentTier1Choice = optionIndex;
-                if (optionIndex == 1) CurrentHp += 150f;
+                CurrentHp += EffectiveMaxHp - previousMaxHp;
                 InvokeHealthChanged();
                 OnSkillProgressionChanged?.Invoke();
                 return true;
@@ -276,6 +347,124 @@ namespace KOA.Core.Entities
                 OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
                 OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
             };
+            Inventory.OnActiveUsed += HandleActiveItemUsed;
+        }
+
+        private void HandleActiveItemUsed(int slotIndex, KOA.Data.Models.ItemData item)
+        {
+            if (item != null && item.ActiveEffect == ItemActiveEffect.CleanseAndCrowdControlImmunity)
+            {
+                ClearDebuffsAndGrantCrowdControlImmunity(1.0f);
+            }
+        }
+
+        public bool ApplyMovementSlow(float percent, float duration)
+        {
+            if (!IsAlive || CrowdControlImmunityRemaining > 0f || percent <= 0f || duration <= 0f) return false;
+            MovementSlowPercent = Mathf.Max(MovementSlowPercent, Mathf.Clamp(percent, 0f, 0.9f));
+            MovementSlowRemaining = Mathf.Max(MovementSlowRemaining, duration);
+            return true;
+        }
+
+        public bool ApplyAttackSpeedSlow(float percent, float duration)
+        {
+            if (!IsAlive || CrowdControlImmunityRemaining > 0f || percent <= 0f || duration <= 0f) return false;
+            AttackSpeedSlowPercent = Mathf.Max(AttackSpeedSlowPercent, Mathf.Clamp(percent, 0f, 0.9f));
+            AttackSpeedSlowRemaining = Mathf.Max(AttackSpeedSlowRemaining, duration);
+            return true;
+        }
+
+        public bool ApplyStun(float duration)
+        {
+            if (!IsAlive || CrowdControlImmunityRemaining > 0f || duration <= 0f) return false;
+            StunRemaining = Mathf.Max(StunRemaining, duration);
+            return true;
+        }
+
+        public bool TryDisplace(Vector3 newPosition)
+        {
+            if (!IsAlive || IsCrowdControlImmune) return false;
+            newPosition.y = Position.y;
+            Position = newPosition;
+            return true;
+        }
+
+        /// <summary>จำกัดจุดหมายให้อยู่ในสนามตาม Section 3.1 ก่อนเริ่มเดิน</summary>
+        protected Vector3 ClampMoveDestination(Vector3 destination)
+        {
+            destination.y = Position.y;
+            return ArenaBounds.Clamp(destination, Radius);
+        }
+
+        public void ClearDebuffsAndGrantCrowdControlImmunity(float immunityDuration)
+        {
+            ClearDebuffs();
+            CrowdControlImmunityRemaining = Mathf.Max(CrowdControlImmunityRemaining, Mathf.Max(0f, immunityDuration));
+        }
+
+        public void ClearDebuffs()
+        {
+            MovementSlowPercent = 0f;
+            MovementSlowRemaining = 0f;
+            AttackSpeedSlowPercent = 0f;
+            AttackSpeedSlowRemaining = 0f;
+            StunRemaining = 0f;
+            _armorShredByAttacker.Clear();
+        }
+
+        public void GrantInvulnerability(float duration)
+        {
+            InvulnerabilityRemaining = Mathf.Max(InvulnerabilityRemaining, Mathf.Max(0f, duration));
+        }
+
+        public void ApplyArmorShred(string attackerId, float percent)
+        {
+            if (string.IsNullOrEmpty(attackerId) || !IsAlive || IsCrowdControlImmune) return;
+            _armorShredByAttacker[attackerId] = Mathf.Clamp(percent, 0f, 0.90f);
+        }
+
+        public void RemoveArmorShred(string attackerId)
+        {
+            if (!string.IsNullOrEmpty(attackerId)) _armorShredByAttacker.Remove(attackerId);
+        }
+
+        public float GetArmorShred(string attackerId)
+        {
+            return !string.IsNullOrEmpty(attackerId) && _armorShredByAttacker.TryGetValue(attackerId, out float value) ? value : 0f;
+        }
+
+        protected void TickSharedSystems(float deltaTime)
+        {
+            Inventory.SimulationTick(deltaTime);
+
+            // Passive resource recovery keeps the duel loop playable between fountain visits.
+            // This remains deterministic Simulation Core state; Presentation only reads the result.
+            if (IsAlive && !IsInFountainZone && CurrentMana < EffectiveMaxMana)
+            {
+                CurrentMana = Mathf.Min(EffectiveMaxMana, CurrentMana + ManaRegenerationPerSecond * deltaTime);
+                InvokeManaChanged();
+            }
+
+            if (CrowdControlImmunityRemaining > 0f)
+                CrowdControlImmunityRemaining = Mathf.Max(0f, CrowdControlImmunityRemaining - deltaTime);
+
+            if (InvulnerabilityRemaining > 0f)
+                InvulnerabilityRemaining = Mathf.Max(0f, InvulnerabilityRemaining - deltaTime);
+
+            if (MovementSlowRemaining > 0f)
+            {
+                MovementSlowRemaining = Mathf.Max(0f, MovementSlowRemaining - deltaTime);
+                if (MovementSlowRemaining <= 0f) MovementSlowPercent = 0f;
+            }
+
+            if (AttackSpeedSlowRemaining > 0f)
+            {
+                AttackSpeedSlowRemaining = Mathf.Max(0f, AttackSpeedSlowRemaining - deltaTime);
+                if (AttackSpeedSlowRemaining <= 0f) AttackSpeedSlowPercent = 0f;
+            }
+
+            if (StunRemaining > 0f)
+                StunRemaining = Mathf.Max(0f, StunRemaining - deltaTime);
         }
 
         /// <summary>
@@ -316,6 +505,7 @@ namespace KOA.Core.Entities
         {
             CurrentLevel++;
             AvailableSkillPoints++;
+            AvailableAttributePoints++;
 
             // ฮีล HP/Mana ส่วนที่เพิ่มขึ้นมา
             CurrentHp += StatGrowth.HpPerLevel;
@@ -323,6 +513,7 @@ namespace KOA.Core.Entities
 
             OnLevelUp?.Invoke(CurrentLevel);
             OnSkillPointsChanged?.Invoke(AvailableSkillPoints);
+            OnAttributePointsChanged?.Invoke(AvailableAttributePoints);
             OnSkillProgressionChanged?.Invoke();
             OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
             OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);
@@ -335,13 +526,14 @@ namespace KOA.Core.Entities
         /// </summary>
         public virtual void TakeDamage(float rawDamage, DamageType damageType, string attackerId = null)
         {
-            if (!IsAlive) return;
+            if (!IsAlive || IsInvulnerable) return;
 
             float netDamage = rawDamage;
             if (damageType == DamageType.Physical)
             {
                 // Damage Reduction = Armor / (100 + Armor)
-                float reduction = EffectiveArmor / (100f + Mathf.Max(0f, EffectiveArmor));
+                float armorAfterShred = EffectiveArmor * (1f - GetArmorShred(attackerId));
+                float reduction = armorAfterShred / (100f + Mathf.Max(0f, armorAfterShred));
                 netDamage = rawDamage * (1f - reduction);
             }
             else if (damageType == DamageType.Magic)
@@ -350,6 +542,9 @@ namespace KOA.Core.Entities
                 float reduction = EffectiveMagicResist / (100f + Mathf.Max(0f, EffectiveMagicResist));
                 netDamage = rawDamage * (1f - reduction);
             }
+
+            if (TalentTier3Choice == 1)
+                netDamage *= 0.90f;
 
             CurrentHp = Mathf.Max(0f, CurrentHp - netDamage);
             OnDamageTaken?.Invoke(netDamage, damageType);
@@ -371,6 +566,9 @@ namespace KOA.Core.Entities
             Position = respawnPosition;
             CurrentHp = EffectiveMaxHp;
             CurrentMana = EffectiveMaxMana;
+            ClearDebuffsAndGrantCrowdControlImmunity(0f);
+            CrowdControlImmunityRemaining = 0f;
+            InvulnerabilityRemaining = 0f;
             OnRespawned?.Invoke();
             OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
             OnManaChanged?.Invoke(CurrentMana, EffectiveMaxMana);

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using KOA.Core.Entities;
+using KOA.Core.Vision;
 using KOA.Core.Input;
 using KOA.Data.Enums;
 using KOA.Presentation.Input;
@@ -21,23 +22,31 @@ namespace KOA.Presentation.Views
         [SerializeField] private WorldSpaceHealthBar healthBar;
         [SerializeField] private RangeIndicatorView rangeIndicator;
         [SerializeField] private DummyTargetView dummyTargetView;
-
-        [Header("VFX & Visual Effects")]
-        [SerializeField] private LineRenderer ironCleaveLineRenderer;
-        [SerializeField] private float vfxDuration = 0.25f;
+        [SerializeField] private MoveCommandIndicatorView moveCommandIndicator;
 
         public HeroBase3D Hero { get; private set; }
         public ITargetable SelectedTarget { get; private set; }
 
         private float _simulationAccumulator = 0f;
         private const float SimulationTickRate = 1.0f / 30.0f; // 30 Ticks/sec ตาม Section 1.1
-        private float _vfxTimer = 0f;
+        private Animator _animator;
+        private bool _hasLocomotionRate;
+        private AudioSource _footstepSource;
+        private AudioClip[] _footstepClips;
+        private float _footstepTimer;
+        private static readonly int MoveSpeedParameter = Animator.StringToHash("MoveSpeed");
+        private static readonly int LocomotionRateParameter = Animator.StringToHash("LocomotionRate");
+        private static readonly int AttackParameter = Animator.StringToHash("Attack");
+        private static readonly int CastParameter = Animator.StringToHash("Cast");
+        private static readonly int DeadParameter = Animator.StringToHash("Dead");
 
         public void BindHero(HeroBase3D hero)
         {
             if (Hero != null) UnsubscribeHeroEvents();
 
             Hero = hero;
+            _animator = GetComponentInChildren<Animator>(true);
+            _hasLocomotionRate = HasAnimatorParameter(_animator, LocomotionRateParameter);
             if (Hero != null)
             {
                 SubscribeHeroEvents();
@@ -88,6 +97,23 @@ namespace KOA.Presentation.Views
                 rangeIndicator = GetComponent<RangeIndicatorView>() ?? gameObject.AddComponent<RangeIndicatorView>();
             }
 
+            if (moveCommandIndicator == null)
+            {
+                moveCommandIndicator = GetComponent<MoveCommandIndicatorView>() ?? gameObject.AddComponent<MoveCommandIndicatorView>();
+            }
+
+            _footstepSource = gameObject.AddComponent<AudioSource>();
+            _footstepSource.playOnAwake = false;
+            _footstepSource.spatialBlend = 0.72f;
+            _footstepSource.minDistance = 2.5f;
+            _footstepSource.maxDistance = 24f;
+            _footstepSource.volume = 0.22f;
+            _footstepClips = new[]
+            {
+                Resources.Load<AudioClip>("KOA/Audio/footstep02"),
+                Resources.Load<AudioClip>("KOA/Audio/footstep07")
+            };
+
             if (Hero == null)
             {
                 BindHero(new VorkasHero(transform.position));
@@ -98,11 +124,35 @@ namespace KOA.Presentation.Views
         {
             Hero.OnHealthChanged += HandleHealthChanged;
             Hero.OnManaChanged += HandleManaChanged;
+            Hero.OnBasicAttackExecuted += HandleBasicAttackExecuted;
 
             if (Hero is VorkasHero v)
             {
                 v.OnIronCleaveExecuted += HandleIronCleaveExecuted;
-                v.OnBasicAttackExecuted += HandleBasicAttackExecuted;
+                v.OnVanguardsWillExecuted += HandleSkillCast;
+                v.OnSeismicSlamExecuted += HandleAreaSkillCast;
+                v.OnRebellionImpactExecuted += HandleAreaSkillCast;
+            }
+            else if (Hero is ZenthisHero z)
+            {
+                z.OnSacredHourglassCast += HandlePositionRadiusSkillCast;
+                z.OnAuraOfEternityCast += HandleSkillCast;
+                z.OnTemporalRiftCast += HandleLineSkillCast;
+                z.OnGrandRewindCast += HandlePositionRadiusSkillCast;
+            }
+            else if (Hero is KorvaxHero k)
+            {
+                k.OnHeavyBoltFired += HandleLineSkillCast;
+                k.OnHuntersFocusActivated += HandleSkillCast;
+                k.OnConcussiveBlastFired += HandlePositionHitSkillCast;
+                k.OnBallistaOverdriveFired += HandleLineSkillCast;
+            }
+            else if (Hero is GravitorHero g)
+            {
+                g.OnMagneticPullCast += HandlePositionSkillCast;
+                g.OnRepulsionZoneCast += HandleRadiusSkillCast;
+                g.OnGravitonWellCast += HandleAreaSkillCast;
+                g.OnGravityCollapseCast += HandlePositionRadiusSkillCast;
             }
         }
 
@@ -110,11 +160,35 @@ namespace KOA.Presentation.Views
         {
             Hero.OnHealthChanged -= HandleHealthChanged;
             Hero.OnManaChanged -= HandleManaChanged;
+            Hero.OnBasicAttackExecuted -= HandleBasicAttackExecuted;
 
             if (Hero is VorkasHero v)
             {
                 v.OnIronCleaveExecuted -= HandleIronCleaveExecuted;
-                v.OnBasicAttackExecuted -= HandleBasicAttackExecuted;
+                v.OnVanguardsWillExecuted -= HandleSkillCast;
+                v.OnSeismicSlamExecuted -= HandleAreaSkillCast;
+                v.OnRebellionImpactExecuted -= HandleAreaSkillCast;
+            }
+            else if (Hero is ZenthisHero z)
+            {
+                z.OnSacredHourglassCast -= HandlePositionRadiusSkillCast;
+                z.OnAuraOfEternityCast -= HandleSkillCast;
+                z.OnTemporalRiftCast -= HandleLineSkillCast;
+                z.OnGrandRewindCast -= HandlePositionRadiusSkillCast;
+            }
+            else if (Hero is KorvaxHero k)
+            {
+                k.OnHeavyBoltFired -= HandleLineSkillCast;
+                k.OnHuntersFocusActivated -= HandleSkillCast;
+                k.OnConcussiveBlastFired -= HandlePositionHitSkillCast;
+                k.OnBallistaOverdriveFired -= HandleLineSkillCast;
+            }
+            else if (Hero is GravitorHero g)
+            {
+                g.OnMagneticPullCast -= HandlePositionSkillCast;
+                g.OnRepulsionZoneCast -= HandleRadiusSkillCast;
+                g.OnGravitonWellCast -= HandleAreaSkillCast;
+                g.OnGravityCollapseCast -= HandlePositionRadiusSkillCast;
             }
         }
 
@@ -144,16 +218,73 @@ namespace KOA.Presentation.Views
             // ซิงค์ตำแหน่งและการหมุนของภาพเข้ากับ Simulation Core
             transform.position = Hero.Position;
             transform.rotation = Hero.Rotation;
+            UpdateAnimationState();
+            UpdateFootstepAudio();
+            UpdateHealthBarVisibility();
 
-            // ปิด Visual Line ของสกิลเมื่อครบเวลา
-            if (_vfxTimer > 0f)
+        }
+
+        private void UpdateFootstepAudio()
+        {
+            if (_footstepSource == null || _footstepClips == null || Hero == null || !Hero.IsAlive || !Hero.IsMoving)
             {
-                _vfxTimer -= Time.deltaTime;
-                if (_vfxTimer <= 0f && ironCleaveLineRenderer != null)
-                {
-                    ironCleaveLineRenderer.enabled = false;
-                }
+                _footstepTimer = 0f;
+                return;
             }
+
+            _footstepTimer -= Time.deltaTime;
+            if (_footstepTimer > 0f) return;
+            AudioClip clip = _footstepClips[Random.Range(0, _footstepClips.Length)];
+            if (clip != null)
+            {
+                _footstepSource.pitch = Random.Range(0.94f, 1.06f);
+                _footstepSource.PlayOneShot(clip);
+            }
+            _footstepTimer = Mathf.Lerp(0.58f, 0.42f, Mathf.InverseLerp(3.8f, 5.8f, Hero.EffectiveMoveSpeed));
+        }
+
+        private void UpdateHealthBarVisibility()
+        {
+            if (healthBar == null || Hero == null) return;
+
+            var bootstrap = KOA.Presentation.Testing.VerticalSliceBootstrap.Instance;
+            HeroBase3D observer = bootstrap != null ? bootstrap.CurrentPlayerHero : null;
+            bool visible = observer == null || VisionSystem.IsHeroVisible(observer, Hero);
+            healthBar.SetVisible(visible);
+        }
+
+        private void UpdateAnimationState()
+        {
+            if (_animator == null || Hero == null) return;
+            _animator.SetFloat(MoveSpeedParameter, Hero.IsMoving ? 1f : 0f, 0.08f, Time.deltaTime);
+            float locomotionRate = Mathf.Clamp(Hero.EffectiveMoveSpeed / 4.3f, 0.78f, 1.25f);
+            if (_hasLocomotionRate) _animator.SetFloat(LocomotionRateParameter, locomotionRate);
+            _animator.SetBool(DeadParameter, !Hero.IsAlive);
+        }
+
+        private static bool HasAnimatorParameter(Animator animator, int parameterHash)
+        {
+            if (animator == null) return false;
+            foreach (AnimatorControllerParameter parameter in animator.parameters)
+            {
+                if (parameter.nameHash == parameterHash) return true;
+            }
+            return false;
+        }
+
+        private void TriggerAttackAnimation()
+        {
+            if (_animator != null) _animator.SetTrigger(AttackParameter);
+        }
+
+        private void TriggerCastAnimation()
+        {
+            if (_animator != null) _animator.SetTrigger(CastParameter);
+        }
+
+        public void ShowMoveCommand(Vector3 position, bool attackCommand)
+        {
+            moveCommandIndicator?.Show(position, attackCommand);
         }
 
         private ITargetable GetTargetFromCollider(Collider col)
@@ -283,11 +414,13 @@ namespace KOA.Presentation.Views
                 {
                     SetSelectedTarget(clickedEnemy);
                     Hero.CurrentAttackTarget = clickedEnemy;
+                    moveCommandIndicator?.Show(clickedEnemy.Position, true);
                 }
                 else
                 {
                     Hero.CurrentAttackTarget = null;
                     Hero.SetMoveDestination(input.TargetDestination);
+                    moveCommandIndicator?.Show(input.TargetDestination, false);
                 }
             }
             else if (input.HasMoveTarget && Hero.CurrentAttackTarget == null)
@@ -296,6 +429,9 @@ namespace KOA.Presentation.Views
             }
 
             // 3. ตรวจสอบการโจมตีหรือใช้สกิล (Section 6.1 - 6.5)
+            bool castAttempted = false;
+            bool castSucceeded = false;
+            int attemptedSkillIndex = -1;
             switch (input.CastIntent)
             {
                 case CastIntent.CastAttack:
@@ -308,40 +444,51 @@ namespace KOA.Presentation.Views
                     break;
 
                 case CastIntent.CastSkill1:
+                    castAttempted = true;
+                    attemptedSkillIndex = 0;
                     var enemiesS1 = GetAllTargets(enemyOnly: true);
-                    if (Hero is VorkasHero v1) v1.TryCastIronCleave(input.AimVector, enemiesS1);
-                    else if (Hero is ZenthisHero z1) z1.TryCastSacredHourglass(input.AimVector, FindTargetNear(input.AimVector, 6.0f, enemyOnly: true));
-                    else if (Hero is KorvaxHero k1) k1.TryCastHeavyBolt(input.AimVector, FindTargetNear(input.AimVector, 10.0f, enemyOnly: true));
-                    else if (Hero is GravitorHero g1) g1.TryCastMagneticPull(input.AimVector, FindTargetNear(input.AimVector, 8.0f, enemyOnly: true));
+                    if (Hero is VorkasHero v1) castSucceeded = v1.TryCastIronCleave(input.AimVector, enemiesS1);
+                    else if (Hero is ZenthisHero z1) castSucceeded = z1.TryCastSacredHourglass(input.AimVector, FindTargetNear(input.AimVector, 6.0f, enemyOnly: true));
+                    else if (Hero is KorvaxHero k1) castSucceeded = k1.TryCastHeavyBolt(input.AimVector, FindTargetNear(input.AimVector, 10.0f, enemyOnly: true));
+                    else if (Hero is GravitorHero g1) castSucceeded = g1.TryCastMagneticPull(input.AimVector, FindTargetNear(input.AimVector, 8.0f, enemyOnly: true));
                     break;
 
                 case CastIntent.CastSkill2:
-                    if (Hero is VorkasHero v2) v2.TryCastVanguardsWill();
-                    else if (Hero is ZenthisHero z2) z2.TryCastAuraOfEternity();
-                    else if (Hero is KorvaxHero k2) k2.TryCastHuntersFocus();
+                    castAttempted = true;
+                    attemptedSkillIndex = 1;
+                    if (Hero is VorkasHero v2) castSucceeded = v2.TryCastVanguardsWill();
+                    else if (Hero is ZenthisHero z2) castSucceeded = z2.TryCastAuraOfEternity();
+                    else if (Hero is KorvaxHero k2) castSucceeded = k2.TryCastHuntersFocus();
                     else if (Hero is GravitorHero g2)
                     {
                         ITargetable skill2Target = FindTargetNear(Hero.Position, 4.0f, enemyOnly: true);
-                        g2.TryCastRepulsionZone(skill2Target);
+                        castSucceeded = g2.TryCastRepulsionZone(skill2Target);
                     }
                     break;
 
                 case CastIntent.CastSkill3:
+                    castAttempted = true;
+                    attemptedSkillIndex = 2;
                     var enemiesS3 = GetAllTargets(enemyOnly: true);
-                    if (Hero is VorkasHero v3) v3.TryCastSeismicSlam(input.AimVector, enemiesS3);
-                    else if (Hero is ZenthisHero z3) z3.TryCastTemporalRift(input.AimVector, enemiesS3);
-                    else if (Hero is KorvaxHero k3) k3.TryCastConcussiveBlast(input.AimVector, FindTargetNear(input.AimVector, 5.0f, enemyOnly: true));
-                    else if (Hero is GravitorHero g3) g3.TryCastGravitonWell(input.AimVector, enemiesS3);
+                    if (Hero is VorkasHero v3) castSucceeded = v3.TryCastSeismicSlam(input.AimVector, enemiesS3);
+                    else if (Hero is ZenthisHero z3) castSucceeded = z3.TryCastTemporalRift(input.AimVector, enemiesS3);
+                    else if (Hero is KorvaxHero k3) castSucceeded = k3.TryCastConcussiveBlast(input.AimVector, FindTargetNear(input.AimVector, 5.0f, enemyOnly: true));
+                    else if (Hero is GravitorHero g3) castSucceeded = g3.TryCastGravitonWell(input.AimVector, enemiesS3);
                     break;
 
                 case CastIntent.CastUltimate:
+                    castAttempted = true;
+                    attemptedSkillIndex = 3;
                     var enemiesUlt = GetAllTargets(enemyOnly: true);
-                    if (Hero is VorkasHero v4) v4.TryCastRebellionImpact(input.AimVector, enemiesUlt);
-                    else if (Hero is ZenthisHero z4) z4.TryCastGrandRewind();
-                    else if (Hero is KorvaxHero k4) k4.TryCastBallistaOverdrive(input.AimVector, FindTargetNear(input.AimVector, 18.0f, enemyOnly: true));
-                    else if (Hero is GravitorHero g4) g4.TryCastGravityCollapse(input.AimVector, FindTargetNear(input.AimVector, 10.0f, enemyOnly: true));
+                    if (Hero is VorkasHero v4) castSucceeded = v4.TryCastRebellionImpact(input.AimVector, enemiesUlt);
+                    else if (Hero is ZenthisHero z4) castSucceeded = z4.TryCastGrandRewind();
+                    else if (Hero is KorvaxHero k4) castSucceeded = k4.TryCastBallistaOverdrive(input.AimVector, FindTargetNear(input.AimVector, 18.0f, enemyOnly: true));
+                    else if (Hero is GravitorHero g4) castSucceeded = g4.TryCastGravityCollapse(input.AimVector, FindTargetNear(input.AimVector, 10.0f, enemyOnly: true));
                     break;
             }
+
+            if (castAttempted && !castSucceeded)
+                MatchHUD.NotifyAbilityRejected(Hero, attemptedSkillIndex);
 
             // 4. ระบบติดตามและเข้าตีเป้าหมายอัตโนมัติ (MOBA Auto-Attack / Walk-in-range)
             // คุมระยะหยุดให้หยุดที่ขอบระยะโจมตี ไม่เดินเข้าไปชนหรือทะลุเข้ากลางตัว Collider
@@ -363,10 +510,7 @@ namespace KOA.Presentation.Views
                             Hero.Rotation = Quaternion.LookRotation(toTarget);
                         }
 
-                        if (Hero is VorkasHero v) v.TryBasicAttack(Hero.CurrentAttackTarget);
-                        else if (Hero is ZenthisHero z) z.TryBasicAttack(Hero.CurrentAttackTarget);
-                        else if (Hero is KorvaxHero k) k.TryBasicAttack(Hero.CurrentAttackTarget);
-                        else if (Hero is GravitorHero g) g.TryBasicAttack(Hero.CurrentAttackTarget);
+                        Hero.TryBasicAttack(Hero.CurrentAttackTarget);
                     }
                     else
                     {
@@ -417,30 +561,21 @@ namespace KOA.Presentation.Views
 
         private void HandleIronCleaveExecuted(Vector3 start, Vector3 end, bool hit)
         {
-            Debug.Log($"[Vorkas] Iron Cleave executed from {start} to {end} (Hit: {hit})");
-
-            if (ironCleaveLineRenderer == null)
-            {
-                ironCleaveLineRenderer = gameObject.AddComponent<LineRenderer>();
-                ironCleaveLineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-                ironCleaveLineRenderer.startColor = new Color(0.2f, 0.9f, 1f, 0.9f);
-                ironCleaveLineRenderer.endColor = new Color(0.7f, 1f, 1f, 0.3f);
-                ironCleaveLineRenderer.startWidth = 1.5f;
-                ironCleaveLineRenderer.endWidth = 1.8f;
-                ironCleaveLineRenderer.positionCount = 2;
-            }
-
-            ironCleaveLineRenderer.enabled = true;
-            ironCleaveLineRenderer.SetPosition(0, start + Vector3.up * 0.5f);
-            ironCleaveLineRenderer.SetPosition(1, end + Vector3.up * 0.5f);
-            _vfxTimer = 0.35f;
+            TriggerCastAnimation();
         }
 
         private void HandleBasicAttackExecuted(Vector3 targetPos)
         {
-            Debug.Log($"[Vorkas] Basic Attack hit target at {targetPos}");
-            DamagePopupManager.Instance?.ShowDamage(targetPos, Hero != null ? Hero.EffectiveAttackDamage : 50f, DamageType.Physical);
+            TriggerAttackAnimation();
         }
+
+        private void HandleSkillCast() => TriggerCastAnimation();
+        private void HandlePositionSkillCast(Vector3 position) => TriggerCastAnimation();
+        private void HandleRadiusSkillCast(float radius) => TriggerCastAnimation();
+        private void HandlePositionHitSkillCast(Vector3 position, bool hit) => TriggerCastAnimation();
+        private void HandlePositionRadiusSkillCast(Vector3 position, float radius) => TriggerCastAnimation();
+        private void HandleLineSkillCast(Vector3 start, Vector3 end, bool hit) => TriggerCastAnimation();
+        private void HandleAreaSkillCast(Vector3 center, float radius, bool hit) => TriggerCastAnimation();
 
         private void OnDrawGizmosSelected()
         {

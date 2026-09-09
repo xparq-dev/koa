@@ -24,7 +24,7 @@ namespace KOA.Core.Entities
         // Skill 3: Concussive Blast (Section 6.3 E)
         public const float Skill3CooldownDuration = 11.0f;
         public const float Skill3ManaCost = 65.0f;
-        public const float Skill3Range = 4.5f;
+        public const float Skill3Range = 4.0f;
 
         public const float UltimateCooldownDuration = 100.0f;
         public const float UltimateManaCost = 120.0f;
@@ -42,6 +42,7 @@ namespace KOA.Core.Entities
 
         // Passive Momentum Piercer Stacks (0-5)
         public int PassiveStacks { get; private set; } = 0;
+        private HeroBase3D _passiveTargetHero;
 
         // Navigation
         public Vector3 TargetDestination { get; private set; }
@@ -60,7 +61,7 @@ namespace KOA.Core.Entities
             baseArmor: 28f,
             baseMr: 26f,
             baseAd: 46f,           // Balance Pass: 52 → 46 (Ranged ไม่ควร AD เท่า Melee Tank)
-            baseSpeed: 7.0f,
+            baseSpeed: 4.5f,
             attackRange: 6.5f,
             statGrowth: HeroStatGrowth.GetGrowthFor("Korvax")
         )
@@ -71,8 +72,7 @@ namespace KOA.Core.Entities
 
         public override void SetMoveDestination(Vector3 destination)
         {
-            destination.y = Position.y;
-            TargetDestination = destination;
+            TargetDestination = ClampMoveDestination(destination);
             IsMoving = true;
         }
 
@@ -84,7 +84,7 @@ namespace KOA.Core.Entities
 
         public override bool TryBasicAttack(ITargetable target)
         {
-            if (!IsAlive || target == null || !target.IsAlive) return false;
+            if (!CanPerformActions || target == null || !target.IsAlive) return false;
             if (target.TeamId == TeamId && target.TeamId != -1) return false;
 
             float distance = Vector3.Distance(Position, target.Position);
@@ -97,14 +97,34 @@ namespace KOA.Core.Entities
                 Rotation = Quaternion.LookRotation(new Vector3(lookDir.x, 0, lookDir.z));
             }
 
+            if (target is HeroBase3D heroTarget)
+            {
+                if (!ReferenceEquals(_passiveTargetHero, heroTarget))
+                {
+                    _passiveTargetHero?.RemoveArmorShred(HeroId);
+                    _passiveTargetHero = heroTarget;
+                    PassiveStacks = 0;
+                }
+                PassiveStacks = Mathf.Min(5, PassiveStacks + 1);
+                heroTarget.ApplyArmorShred(HeroId, PassiveStacks * 0.03f);
+            }
+            else
+            {
+                _passiveTargetHero?.RemoveArmorShred(HeroId);
+                _passiveTargetHero = null;
+                PassiveStacks = 0;
+            }
+
             target.TakeDamage(EffectiveAttackDamage, DamageType.Physical, HeroId);
             AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
+            InvokeBasicAttackExecuted(target.Position);
             return true;
         }
 
         public bool TryBasicAttack(DummyTarget target) => TryBasicAttack((ITargetable)target);
 
-        public float EffectiveRange => AttackRange + (Skill2ActiveTimer > 0f ? (0.75f + Skill2Rank * 0.25f) : 0f);
+        public float EffectiveRange => AttackRange + (Skill2ActiveTimer > 0f ? 2.5f : 0f);
+        public override float EffectiveAttackDamage => base.EffectiveAttackDamage + (Skill2ActiveTimer > 0f ? 10f + Skill2Rank * 10f : 0f);
 
         /// <summary>
         /// Skill 1: Heavy Bolt (SKILLSHOT_LINE) Section 6.3 & 6.5
@@ -114,7 +134,7 @@ namespace KOA.Core.Entities
             if (!IsAlive || Skill1Rank <= 0 || Skill1CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill1ManaCost)) return false;
 
-            Skill1CooldownRemaining = Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 0.8f);
+            Skill1CooldownRemaining = ApplyAbilityCooldownReduction(Mathf.Max(6.0f, Skill1CooldownDuration - (Skill1Rank - 1) * 0.8f));
 
             Vector3 aimDir = (aimWorldPos - Position);
             aimDir.y = 0;
@@ -131,9 +151,9 @@ namespace KOA.Core.Entities
                 hit = Vector3.Distance(Position, target.Position) <= Skill1Range;
                 if (hit)
                 {
-                    float baseDmg = 80f + (Skill1Rank - 1) * 50f;
-                    float adRatio = 0.8f + (Skill1Rank - 1) * 0.12f;
-                    float damage = baseDmg + (EffectiveAttackDamage * adRatio);
+                    float baseDmg = 90f + (Skill1Rank - 1) * 55f;
+                    float adRatio = 0.90f;
+                    float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * adRatio));
                     target.TakeDamage(damage, DamageType.Physical, HeroId);
                 }
             }
@@ -152,8 +172,8 @@ namespace KOA.Core.Entities
             if (!IsAlive || Skill2Rank <= 0 || Skill2CooldownRemaining > 0f) return false;
             if (!TryConsumeMana(Skill2ManaCost)) return false;
 
-            Skill2CooldownRemaining = Skill2CooldownDuration;
-            Skill2ActiveTimer = 3.0f + (Skill2Rank * 0.5f);
+            Skill2CooldownRemaining = ApplyAbilityCooldownReduction(Skill2CooldownDuration);
+            Skill2ActiveTimer = Skill2Duration;
 
             OnHuntersFocusActivated?.Invoke();
             return true;
@@ -169,7 +189,7 @@ namespace KOA.Core.Entities
             if (!TryConsumeMana(Skill3ManaCost)) return false;
 
             float cd = Mathf.Max(6.5f, Skill3CooldownDuration - (Skill3Rank - 1) * 0.8f);
-            Skill3CooldownRemaining = cd;
+            Skill3CooldownRemaining = ApplyAbilityCooldownReduction(cd);
 
             Vector3 blastDir = (aimWorldPos - Position);
             blastDir.y = 0;
@@ -186,14 +206,15 @@ namespace KOA.Core.Entities
                 {
                     hit = true;
                     float baseDmg = 70f + (Skill3Rank - 1) * 40f;
-                    float damage = baseDmg + (EffectiveAttackDamage * 0.50f);
+                    float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
                     target.TakeDamage(damage, DamageType.Physical, HeroId);
 
                     // ผลักศัตรูถอยหลัง 3.5m (ยกเว้นป้อม)
                     Vector3 pushDir = (target.Position - Position).normalized;
                     if (target is HeroBase3D heroTarget)
                     {
-                        heroTarget.Position += pushDir * 3.5f;
+                        if (heroTarget.TryDisplace(heroTarget.Position + pushDir * 3.5f))
+                            heroTarget.ApplyMovementSlow(0.40f, 2.0f);
                     }
                     else if (target is MinionEntity minionTarget)
                     {
@@ -216,7 +237,7 @@ namespace KOA.Core.Entities
             if (!IsAlive || UltimateRank <= 0 || UltimateCooldownRemaining > 0f) return false;
             if (!TryConsumeMana(UltimateManaCost)) return false;
 
-            UltimateCooldownRemaining = 110f - (UltimateRank * 15f);
+            UltimateCooldownRemaining = ApplyAbilityCooldownReduction(115f - (UltimateRank * 15f));
 
             Vector3 aimDir = (aimWorldPos - Position);
             aimDir.y = 0;
@@ -233,9 +254,9 @@ namespace KOA.Core.Entities
                 hit = Vector3.Distance(Position, target.Position) <= UltimateRange;
                 if (hit)
                 {
-                    float baseDmg = 220f + (UltimateRank - 1) * 110f;
-                    float adRatio = 1.0f + (UltimateRank - 1) * 0.25f;
-                    float damage = baseDmg + (EffectiveAttackDamage * adRatio);
+                    float baseDmg = 300f + (UltimateRank - 1) * 150f;
+                    float adRatio = 1.40f;
+                    float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * adRatio));
                     target.TakeDamage(damage, DamageType.Physical, HeroId);
                 }
             }
@@ -248,9 +269,8 @@ namespace KOA.Core.Entities
 
         public override void SimulationTick(float deltaTime)
         {
+            TickSharedSystems(deltaTime);
             if (!IsAlive) return;
-
-            Inventory.SimulationTick(deltaTime);
 
             if (Skill1CooldownRemaining > 0f) Skill1CooldownRemaining -= deltaTime;
             if (Skill2CooldownRemaining > 0f) Skill2CooldownRemaining -= deltaTime;
@@ -258,6 +278,8 @@ namespace KOA.Core.Entities
             if (UltimateCooldownRemaining > 0f) UltimateCooldownRemaining -= deltaTime;
             if (Skill2ActiveTimer > 0f) Skill2ActiveTimer -= deltaTime;
             if (AttackCooldownRemaining > 0f) AttackCooldownRemaining = UnityEngine.Mathf.Max(0f, AttackCooldownRemaining - deltaTime);
+
+            if (IsStunned) return;
 
             if (IsMoving)
             {

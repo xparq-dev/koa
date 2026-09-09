@@ -31,7 +31,7 @@ namespace KOA.Core.Minions
         public float AttackDamage { get; private set; }
         public float Armor { get; private set; }
         public float MagicResist { get; private set; }
-        public float MoveSpeed { get; private set; } = 5.5f;
+        public float MoveSpeed { get; private set; } = 3.25f;
         public float AttackRange { get; private set; }
         public float AttackCooldown { get; private set; } = 1.2f;
         public float Radius => Type switch

@@ -8,6 +8,8 @@
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
 /[Aa]ssets/AssetStoreTools*
+/Assets/_Recovery/
+/Assets/_Recovery.meta
 
 # Visual Studio / Rider / IDE cache
 .vs/
