@@ -97,8 +97,8 @@ Scope ของเกมขยายขึ้นจริงจากที่�
 | 38-39 | **Talent Tree System** (Section 6.6) — UI เลือก A/B ที่ Level 4/8/12, เชื่อมกับปุ่ม `T` |
 | 40 | **Attribute Bonus System** (Section 6.7) — UI ลงแต้ม 4 หมวด, เชื่อมกับปุ่ม `Ctrl+U` |
 | 41 | FSM Bot Easy Tier + Hard Tier (Hard ใช้ Prediction Algorithm ให้ AI ช่วยเขียนสมการเวกเตอร์) |
-| 42 | UI/HUD และ Control Polish (Section 7-8): Kill Feed แยกจาก Ability Feedback ที่ไม่ทับ Mini Map, Cooldown/NO MANA state, Skill Tooltip, F1 Hero Profile, Mini Map interaction/expand, HUD input shield, Camera FREE/LOCKED, มุมเลนพาดเฉียงบนหน้าจอ และแผง Control แบบย่อได้ |
-| 43 | Combat Readability & Balance Pass รอบแรก: ทดสอบทุกคู่ matchup (4x4), Target Validation/Resource Commitment ของ Single Target-Skillshot-Ground-Self Cast, textured VFX/SFX ของฮีโร่-ป้อม-ครีป, กรอง Damage Popup ของครีปที่ตีกันเองและป้องกันเลขซ้ำ, Animation timing, movement pace และปรับค่าตัวเลขที่ไม่สมดุล |
+| 42 | UI/HUD และ Control Polish (Section 7-8): Kill Feed แยกจาก Ability Feedback ที่ไม่ทับ Mini Map, Last-Hit coin/+Gold feedback, Hero/Tower reward feed, Cooldown/NO MANA state, Skill Tooltip, F1 Hero Profile, Mini Map interaction/expand, HUD input shield, Camera FREE/LOCKED, มุมเลนพาดเฉียงบนหน้าจอ และแผง Control แบบย่อได้ |
+| 43 | Combat Readability & Environment Pass รอบแรก: ทดสอบทุกคู่ matchup (4x4), Target Validation/Resource Commitment, textured VFX/SFX, กรอง Damage Popup ของครีป, Animation timing/movement pace, และฉาก `DuelArena` ตาม Point Symmetry, Rhythmic Spacing, Occlusion Framing, Sightline Bush และ Focal Lighting |
 
 **Exit Criteria:** เล่นได้ครบ 4 ฮีโร่ x 3 ระดับความยาก Bot, Shop/Talent/Attribute ใช้งานได้จริงครบ
 
@@ -144,6 +144,6 @@ Scope ของเกมขยายขึ้นจริงจากที่�
 
 ## สถานะการดำเนินงานล่าสุด
 
-อัปเดตเมื่อ **2026-09-09**: Phase 0-2 มี implementation artifacts ครบ; Phase 3 เปิดงาน Week 42-43 กลับมาเพื่อแก้ Combat Readability, Animation/Movement, Camera/Mini Map, HUD/Shop และ Free Asset integration ตามผล playtest ล่าสุด Unity batch import/script compile ผ่านแล้วและ Core verification ผ่าน 15/15; งานรอบนี้ยังต้องรอ manual playtest และการยอมรับด้านภาพ/เสียงจาก Owner ก่อนปิด Phase 3 ส่วน Phase 4 ยังต้องดำเนินการตาม Week 44-47 ก่อนประกาศ Version 1.0.0
+อัปเดตเมื่อ **2026-09-10**: Phase 0-2 มี implementation artifacts ครบ; Phase 3 เปิดงาน Week 42-43 กลับมาเพื่อแก้ Combat Readability, Animation/Movement, Camera/Mini Map, HUD/Shop, Free Asset integration และ Duel Lane Environment ตามผล playtest ล่าสุด Source รอบปัจจุบันเพิ่ม Last-Hit coin/+Gold feedback, Team-safe Damage Source และ Hero/Tower reward feed แล้ว ชุดตรวจ Core เพิ่มกรณี Last-Hit ownership แต่ยังรอ Owner เปิด Unity เพื่อ compile, รันชุดตรวจ และ visual playtest โดยไม่มี Player Build จาก Codex งานภาพ/เสียงยังต้องได้รับ Owner acceptance ก่อนปิด Phase 3 และ Phase 4 ยังต้องดำเนินการตาม Week 44-47 ก่อนประกาศ Version 1.0.0
 
 ดูหลักฐานและรายการ gate ที่เหลือใน [`Project_KOA_Phase_Status_2026-09-08.md`](Project_KOA_Phase_Status_2026-09-08.md)

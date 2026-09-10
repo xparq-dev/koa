@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.IO;
 using System.Linq;
+using KOA.Core.World;
 using KOA.Presentation.Testing;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -21,7 +22,7 @@ namespace KOA.Editor
             GameObject cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
             Camera camera = cameraObject.AddComponent<Camera>();
-            camera.fieldOfView = 45f;
+            camera.fieldOfView = 46f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 180f;
             camera.allowHDR = true;
@@ -35,9 +36,9 @@ namespace KOA.Editor
             LogStructureRenderers("BlueNexus");
 
             Directory.CreateDirectory(OutputDirectory);
-            CaptureAt(camera, new Vector3(0f, 0.7f, -14f), Path.Combine(OutputDirectory, "tower_lane.png"));
-            CaptureAt(camera, new Vector3(0f, 0.7f, 7f), Path.Combine(OutputDirectory, "waterfall_center.png"));
-            CaptureAt(camera, new Vector3(0f, 0.7f, -46f), Path.Combine(OutputDirectory, "nexus_valley.png"));
+            CaptureAt(camera, DuelArenaLayout.BlueOuterTower + Vector3.up * 0.7f, Path.Combine(OutputDirectory, "tower_lane.png"));
+            CaptureAt(camera, Vector3.up * 0.7f, Path.Combine(OutputDirectory, "waterfall_center.png"));
+            CaptureAt(camera, DuelArenaLayout.BlueNexus + Vector3.up * 0.7f, Path.Combine(OutputDirectory, "nexus_valley.png"));
 
             Debug.Log($"KOA_ARENA_PREVIEW:PASS output={OutputDirectory} count=3");
         }
@@ -60,9 +61,9 @@ namespace KOA.Editor
 
         private static void CaptureAt(Camera camera, Vector3 focusPoint, string path)
         {
-            Quaternion rotation = Quaternion.Euler(50f, 0f, 0f);
+            Quaternion rotation = Quaternion.Euler(60f, -45f, 0f);
             camera.transform.SetPositionAndRotation(
-                focusPoint + rotation * new Vector3(0f, 0f, -15f),
+                focusPoint + rotation * new Vector3(0f, 0f, -24f),
                 rotation);
 
             var renderTexture = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);

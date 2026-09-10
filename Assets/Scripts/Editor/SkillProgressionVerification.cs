@@ -171,7 +171,7 @@ namespace KOA.Editor
 
             RunTest("Tower Escalation Spawns (Section 3.2)", ref passed, ref total, () =>
             {
-                var match = new MatchSimulation(new Vector3(0f, 0f, -60f), new Vector3(0f, 0f, 60f));
+                var match = new MatchSimulation(DuelArenaLayout.BlueFountain, DuelArenaLayout.RedFountain);
                 bool cannonSpawned = false;
                 bool superSpawned = false;
                 match.BlueSpawner.OnWaveSpawned += wave =>
@@ -191,6 +191,57 @@ namespace KOA.Editor
                 match.BlueSpawner.SimulationTick(5.1f);
                 Assert(cannonSpawned, "The next wave must contain a Cannon Minion");
                 Assert(superSpawned, "The next wave must contain a Super Creep");
+            });
+
+            RunTest("Last-Hit Gold Ownership & Reward Event (Section 4.1)", ref passed, ref total, () =>
+            {
+                var match = new MatchSimulation(DuelArenaLayout.BlueFountain, DuelArenaLayout.RedFountain);
+                match.BlueHero = new VorkasHero(DuelArenaLayout.BlueFountain) { TeamId = 0 };
+                match.RedHero = new VorkasHero(DuelArenaLayout.RedFountain) { TeamId = 1 };
+                GoldRewardEvent lastReward = default;
+                int rewardCount = 0;
+                match.OnGoldRewardGranted += reward =>
+                {
+                    lastReward = reward;
+                    rewardCount++;
+                };
+
+                match.RedSpawner.SimulationTick(5.1f);
+                var firstTarget = match.ActiveMinions.Find(m => m.TeamId == 1);
+                int blueBefore = match.BlueWallet.CurrentGold;
+                int redBefore = match.RedWallet.CurrentGold;
+                firstTarget.TakeDamage(100000f, DamageType.TrueDamage, match.BlueHero.DamageSourceId);
+
+                Assert(match.BlueWallet.CurrentGold == blueBefore + firstTarget.GoldBounty,
+                    "Blue hero last hit must credit only the Blue wallet");
+                Assert(match.RedWallet.CurrentGold == redBefore,
+                    "Identical hero selections must not credit the opposing wallet");
+                Assert(rewardCount == 1 && lastReward.Reason == GoldRewardReason.MinionLastHit,
+                    "A confirmed hero last hit must publish exactly one reward event");
+                Assert(lastReward.RecipientTeamId == 0 && lastReward.Amount == firstTarget.GoldBounty,
+                    "Reward event must identify the receiving team and exact bounty");
+
+                var secondTarget = match.ActiveMinions.Find(m => m.TeamId == 1 && m.IsAlive);
+                int noLastHitGold = match.BlueWallet.CurrentGold;
+                secondTarget.TakeDamage(100000f, DamageType.TrueDamage, "minion_0_test");
+                Assert(match.BlueWallet.CurrentGold == noLastHitGold,
+                    "An allied minion kill must not grant hero last-hit gold");
+                Assert(rewardCount == 1, "Non-hero kills must not publish a gold reward event");
+
+                string eliminationFeed = null;
+                match.OnKillFeedMessage += message => eliminationFeed = message;
+                int heroKillGoldBefore = match.BlueWallet.CurrentGold;
+                match.RedHero.TakeDamage(100000f, DamageType.TrueDamage, match.BlueHero.DamageSourceId);
+                int heroBounty = match.RecordHeroElimination(match.RedHero);
+                Assert(heroBounty > 0 && match.BlueWallet.CurrentGold == heroKillGoldBefore + heroBounty,
+                    "Hero elimination must grant the exact reported bounty");
+                Assert(rewardCount == 2 && lastReward.Reason == GoldRewardReason.HeroElimination,
+                    "Hero elimination must publish one structured reward event");
+                Assert(!string.IsNullOrEmpty(eliminationFeed)
+                    && eliminationFeed.Contains(match.BlueHero.DisplayName)
+                    && eliminationFeed.Contains(match.RedHero.DisplayName)
+                    && eliminationFeed.Contains($"+{heroBounty} gold"),
+                    "Elimination feed must identify both heroes and the exact gold reward");
             });
 
             RunTest("Shop Stats, Cooldown Reduction & Active Item", ref passed, ref total, () =>
@@ -226,9 +277,9 @@ namespace KOA.Editor
                 var target = new KorvaxHero(new Vector3(0f, 0f, 8f)) { TeamId = 1 };
                 Assert(VisionSystem.IsHeroVisible(observer, target), "Enemy inside vision range and outside brush should be visible");
 
-                target.Position = new Vector3(8f, 0f, 0f);
+                target.Position = DuelArenaLayout.RedBrush;
                 Assert(!VisionSystem.IsHeroVisible(observer, target), "Enemy inside brush should be hidden from an outside observer");
-                observer.Position = new Vector3(8f, 0f, 1f);
+                observer.Position = DuelArenaLayout.RedBrush + Vector3.forward;
                 Assert(VisionSystem.IsHeroVisible(observer, target), "Enemy should be visible to an observer in the same brush");
                 target.Position = new Vector3(8f, 0f, 20f);
                 Assert(!VisionSystem.IsHeroVisible(observer, target), "Enemy outside hero vision range should be hidden");
@@ -258,6 +309,27 @@ namespace KOA.Editor
                 Vector2 redCorner = ArenaBounds.ToNormalized(new Vector3(13f, 0f, 65f));
                 Assert(blueCorner == Vector2.zero, "Blue corner must map to minimap origin");
                 Assert(redCorner == Vector2.one, "Red corner must map to minimap maximum");
+            });
+
+            RunTest("Duel Lane Point Symmetry & Rhythm (Section 3.1)", ref passed, ref total, () =>
+            {
+                Assert(DuelArenaLayout.RedFountain == DuelArenaLayout.MirrorPoint(DuelArenaLayout.BlueFountain), "Fountains must use point symmetry");
+                Assert(DuelArenaLayout.RedNexus == DuelArenaLayout.MirrorPoint(DuelArenaLayout.BlueNexus), "Nexus anchors must use point symmetry");
+                Assert(DuelArenaLayout.RedInnerTower == DuelArenaLayout.MirrorPoint(DuelArenaLayout.BlueInnerTower), "Inner Towers must use point symmetry");
+                Assert(DuelArenaLayout.RedOuterTower == DuelArenaLayout.MirrorPoint(DuelArenaLayout.BlueOuterTower), "Outer Towers must use point symmetry");
+                Assert(DuelArenaLayout.RedBrush == DuelArenaLayout.MirrorPoint(DuelArenaLayout.BlueBrush), "Brushes must use point symmetry");
+                Assert(Mathf.Abs(DuelArenaLayout.BlueBrush.x) > DuelArenaLayout.BrushHalfWidth, "Brushes must remain offset from the lane centerline");
+                Assert(Mathf.Abs(DuelArenaLayout.BlueBrush.z) > DuelArenaLayout.BrushHalfLength, "Brushes must remain offset from the Duel Plaza sightline");
+                Assert(DuelArenaLayout.FountainZ + MatchSimulation.FountainZoneRadius <= ArenaBounds.HalfLength,
+                    "Fountain healing zone must remain inside the playable arena");
+
+                float centerToOuter = DuelArenaLayout.OuterTowerZ;
+                float outerToInner = DuelArenaLayout.InnerTowerZ - DuelArenaLayout.OuterTowerZ;
+                float innerToNexus = DuelArenaLayout.NexusZ - DuelArenaLayout.InnerTowerZ;
+                float nexusToFountain = DuelArenaLayout.FountainZ - DuelArenaLayout.NexusZ;
+                Assert(centerToOuter < outerToInner, "Spacing must tighten from Inner Tower toward center");
+                Assert(outerToInner < innerToNexus, "Spacing must tighten from Nexus toward center");
+                Assert(innerToNexus < nexusToFountain, "Spacing must tighten from Fountain toward center");
             });
 
             RunTest("All 16 Abilities Cast Contract", ref passed, ref total, () =>
@@ -346,9 +418,9 @@ namespace KOA.Editor
 
             RunTest("20-Minute Core Stability Simulation", ref passed, ref total, () =>
             {
-                var match = new MatchSimulation(new Vector3(0f, 0f, -60f), new Vector3(0f, 0f, 60f));
-                match.BlueHero = new VorkasHero(new Vector3(0f, 0f, -60f)) { TeamId = 0 };
-                match.RedHero = new GravitorHero(new Vector3(0f, 0f, 60f)) { TeamId = 1 };
+                var match = new MatchSimulation(DuelArenaLayout.BlueFountain, DuelArenaLayout.RedFountain);
+                match.BlueHero = new VorkasHero(DuelArenaLayout.BlueFountain) { TeamId = 0 };
+                match.RedHero = new GravitorHero(DuelArenaLayout.RedFountain) { TeamId = 1 };
                 const float tick = 1f / 30f;
                 const int tickCount = 20 * 60 * 30;
 

@@ -101,21 +101,21 @@ namespace KOA.Core.Entities
             {
                 if (!ReferenceEquals(_passiveTargetHero, heroTarget))
                 {
-                    _passiveTargetHero?.RemoveArmorShred(HeroId);
+                    _passiveTargetHero?.RemoveArmorShred(DamageSourceId);
                     _passiveTargetHero = heroTarget;
                     PassiveStacks = 0;
                 }
                 PassiveStacks = Mathf.Min(5, PassiveStacks + 1);
-                heroTarget.ApplyArmorShred(HeroId, PassiveStacks * 0.03f);
+                heroTarget.ApplyArmorShred(DamageSourceId, PassiveStacks * 0.03f);
             }
             else
             {
-                _passiveTargetHero?.RemoveArmorShred(HeroId);
+                _passiveTargetHero?.RemoveArmorShred(DamageSourceId);
                 _passiveTargetHero = null;
                 PassiveStacks = 0;
             }
 
-            target.TakeDamage(EffectiveAttackDamage, DamageType.Physical, HeroId);
+            target.TakeDamage(EffectiveAttackDamage, DamageType.Physical, DamageSourceId);
             AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
             InvokeBasicAttackExecuted(target.Position);
             return true;
@@ -154,7 +154,7 @@ namespace KOA.Core.Entities
                     float baseDmg = 90f + (Skill1Rank - 1) * 55f;
                     float adRatio = 0.90f;
                     float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * adRatio));
-                    target.TakeDamage(damage, DamageType.Physical, HeroId);
+                    target.TakeDamage(damage, DamageType.Physical, DamageSourceId);
                 }
             }
 
@@ -205,7 +205,7 @@ namespace KOA.Core.Entities
 
             float baseDmg = 70f + (Skill3Rank - 1) * 40f;
             float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
-            target.TakeDamage(damage, DamageType.Physical, HeroId);
+            target.TakeDamage(damage, DamageType.Physical, DamageSourceId);
 
             // ผลักศัตรูถอยหลัง 3.5m (ยกเว้นป้อม)
             Vector3 pushDir = (target.Position - Position).normalized;
@@ -253,7 +253,7 @@ namespace KOA.Core.Entities
                     float baseDmg = 300f + (UltimateRank - 1) * 150f;
                     float adRatio = 1.40f;
                     float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * adRatio));
-                    target.TakeDamage(damage, DamageType.Physical, HeroId);
+                    target.TakeDamage(damage, DamageType.Physical, DamageSourceId);
                 }
             }
 

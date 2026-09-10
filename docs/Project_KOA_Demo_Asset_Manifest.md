@@ -9,7 +9,7 @@
 - ปลายทางหลัก: `Assets/ThirdParty`
 - ไฟล์ที่ Project KOA สร้างเพิ่ม: Material, Animator Controller และ Prefab อยู่ใน `Assets/Presentation/Art` และ `Assets/Resources/KOA/Demo`
 - สถาปัตยกรรม: Asset ถูกเรียกผ่าน Presentation เท่านั้นตาม Requirement Section 1.1; Simulation Core ไม่อ้างอิงโมเดล, Material หรือ Unity prefab
-- รอบนี้ทำเฉพาะ Unity Import/Compile และ validation; **ไม่ได้สั่ง Build**
+- Asset baseline ผ่าน Unity Import/Compile จากรอบก่อน; รอบ Environment ล่าสุดแก้ source/documentation และรอ Owner เปิด Unity เพื่อตรวจ compile/ภาพจริง โดย **ไม่ได้สั่ง Build**
 
 ## ชุดที่เลือกใช้ใน Demo
 
@@ -26,7 +26,7 @@
 | Kenney — Input Prompts 1.5A | CC0 1.0 | Prompt ที่ใช้กับปุ่มควบคุม KOA 18 ภาพ | เตรียมไว้สำหรับหน้าคู่มือ/คำใบ้ปุ่ม; ยังไม่ผูก runtime |
 | Kenney — Particle Pack 1.1 | CC0 1.0 | 14 PNG แบบ transparent ที่คัดใช้จาก 80 ภาพ | Slash, projectile, impact, magic glyph, aura, flame, dirt, smoke และ gravity vortex ของฮีโร่ ป้อม และครีป |
 | Kenney — RPG Audio | CC0 1.0 | 7 OGG จากชุด 50 เสียง | เสียงฟัน กระแทก กลไก และฝีเท้า; ผูกกับจังหวะ combat/locomotion |
-| Kenney — Interface Sounds | CC0 1.0 | 8 OGG ที่คัดใช้ | เสียงเปิด/ปิด/ย่อ/ขยาย, toggle, confirmation และ error ของ HUD |
+| Kenney — Interface Sounds | CC0 1.0 | 8 OGG ที่คัดใช้ | เสียงเปิด/ปิด/ย่อ/ขยาย, toggle, confirmation, Last-Hit reward และ error ของ HUD |
 
 หมายเหตุ QAL: ใช้ในงานส่วนตัว การศึกษา และเชิงพาณิชย์ได้โดยไม่ต้องให้เครดิต แต่ห้ามนำ Asset ไปขายหรือแจกต่อในลักษณะ asset/asset pack แยกเดี่ยว รายละเอียดฉบับเต็มเก็บไว้ที่ `Assets/ThirdParty/Quaternius/Monsters/Dungeon/License_Standard.txt`
 
@@ -74,6 +74,10 @@
 - ตั้งกล้อง pitch 60 องศา, vertical FOV 46 องศา และระยะเริ่มต้น 24 เมตรภายในช่วง 18-32 เมตรตาม Requirement Section 7.1 เพื่อเห็นพื้นที่ต่อสู้ ขอบสะพาน และหุบเหวได้กว้างขึ้น
 - Runtime โหลด prefab จาก `Resources/KOA/Demo` และย้อนกลับไปใช้ primitive เดิมได้หาก Asset ใดหาย
 - ไม่ได้นำ third-party script, sample scene หรือ ProjectSettings จากแพ็กเข้ามา
+- Environment review รอบ Duel Lane ใช้ Primitive สร้าง spawn fortress, gate, cliff segments และ Fountain basin; ใช้ Unity Terrain Detail กับ grass texture ที่สร้าง runtime จึงไม่มี source/license ภายนอกเพิ่ม
+- ตำแหน่ง Fountain/Nexus/Tower/Bush อ่านจาก `DuelArenaLayout` ฝั่ง Core และสร้างฝั่งตรงข้ามด้วย Point Symmetry; ระยะ 17/15/13/12 เมตรกระชับเข้าหากลางเลน
+- หน้าผาแบ่งความสูงและความยาวเป็นช่วงแบบ serial vision, ป่าใช้กลุ่ม rule-of-thirds และ mirrored pairs, น้ำตกมีคู่กลาง Duel Plaza พร้อมคู่ด้านนอกแบบสมมาตร
+- Focal light hierarchy ล็อกเป็น Nexus > Fountain > Inner Tower > Outer Tower โดยใช้ emission และ Point Light ฝั่ง Presentation เท่านั้น
 
 ## ชุดที่ยังไม่ใช้
 

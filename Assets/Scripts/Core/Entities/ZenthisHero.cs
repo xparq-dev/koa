@@ -100,7 +100,7 @@ namespace KOA.Core.Entities
                 Rotation = Quaternion.LookRotation(new Vector3(lookDir.x, 0, lookDir.z));
             }
 
-            target.TakeDamage(EffectiveAttackDamage, DamageType.Magic, HeroId);
+            target.TakeDamage(EffectiveAttackDamage, DamageType.Magic, DamageSourceId);
             AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
             InvokeBasicAttackExecuted(target.Position);
             return true;
@@ -132,7 +132,7 @@ namespace KOA.Core.Entities
                     float baseDmg = 70f + (Skill1Rank - 1) * 45f;
                     float ratio = 0.65f;
                     float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * ratio));
-                    target.TakeDamage(damage, DamageType.Magic, HeroId);
+                    target.TakeDamage(damage, DamageType.Magic, DamageSourceId);
                     if (target is HeroBase3D heroTarget)
                         heroTarget.ApplyMovementSlow(0.35f, 2.5f);
                 }
@@ -194,7 +194,7 @@ namespace KOA.Core.Entities
                         if (CheckSkillshotLineHit(startPos, endPos, Skill3Width, t.Position, t.Radius))
                         {
                             hit = true;
-                            t.TakeDamage(damage, DamageType.Magic, HeroId);
+                            t.TakeDamage(damage, DamageType.Magic, DamageSourceId);
                             if (t is HeroBase3D heroTarget)
                                 heroTarget.ApplyAttackSpeedSlow(0.40f, 3.0f);
                         }

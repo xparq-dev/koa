@@ -10,12 +10,12 @@ Project KOA เป็นเกม MOBA แบบ 1v1 บนแผนที่เ
 
 ## สถานะปัจจุบัน
 
-อัปเดตล่าสุด: **2026-09-09**
+อัปเดตล่าสุด: **2026-09-10**
 
 - Phase 0-2 มี implementation artifacts ของ Foundation, Core Loop, Bot, Arena, Economy, Tower และ Minion แล้ว
 - Phase 3 Week 28-43 มีฮีโร่ 4 ตัว, สกิล, Shop, Talent, Attribute, Bot 3 ระดับ และรอบ Combat/UI/Control Polish แล้ว
-- Unity batch import และ script compilation ผ่านโดยไม่มี C# error หรือ warning
-- Core verification ผ่าน **15/15** รวมการใช้ Q/W/E/R ซ้ำหลังคูลดาวน์, สกิลครบ 16 ท่า, matchup smoke matrix 4x4 และ simulation ต่อเนื่อง 20 นาที
+- Baseline ก่อนรอบ Environment ผ่าน Unity script compilation และ Core verification แล้ว; source รอบล่าสุดรอ Owner เปิด Unity เพื่อ compile และ visual playtest โดยไม่สั่ง Player Build จาก Codex
+- ชุดตรวจ Core มีกรณี Q/W/E/R ซ้ำหลังคูลดาวน์, สกิลครบ 16 ท่า, matchup smoke matrix 4x4, simulation ต่อเนื่อง 20 นาที, Point Symmetry/Rhythmic Spacing และ Last-Hit ownership เมื่อทั้งสองฝั่งเลือกฮีโร่ชนิดเดียวกัน
 - Phase 3 ยังไม่ปิดจนกว่า Owner จะทดสอบใน Unity Engine และยอมรับด้านภาพ เสียง Animation และการควบคุม
 - ยังไม่มี Player Build จากรอบนี้ เจ้าของโปรเจกต์จะเป็นผู้ Run และ Build ผ่าน Unity Engine
 - Phase 4 ยังเหลือ Bug Bash, Performance Profiling, Acceptance Criteria 8 ข้อ และ Release Preparation
@@ -42,11 +42,16 @@ Project KOA เป็นเกม MOBA แบบ 1v1 บนแผนที่เ
 
 - Duel Arena ขนาดประมาณ 130 x 26 เมตร พร้อมขอบเขตบังคับ
 - Fountain, Outer Tower, Inner Tower และ Nexus ฝั่งละหนึ่งชุด
-- แผนที่สะพานสูงพร้อมสภาพแวดล้อมหน้าผา ป่า น้ำ และฉากระดับล่าง
+- Gameplay anchors ใช้ Point Symmetry จาก Core layout เดียว และช่องไฟ Fountain→Nexus→Inner→Outer กระชับเข้าหากลางเลนแบบ 17→15→13→12 เมตร
+- แผนที่สะพานสูงมีหน้าผาต่างระดับเป็นช่วง, ป่าจังหวะ rule-of-thirds, Terrain Detail Grass, ลำน้ำ/น้ำตก, เมฆ, ป้อมฐานและประตู Primitive
+- Bush สองฝั่งเยื้องแกนกลางและวางแบบ Point Symmetry เพื่อสร้าง Sightline decision
+- ลำดับแสงเป้าหมายคือ Nexus สว่างที่สุด ตามด้วย Fountain และ Tower
 - ครีปพื้นฐาน 2 Melee + 1 Ranged เกิดทุก 25 วินาที
 - Cannon Minion และ Super Creep จาก Tower Escalation
 - Tower Heating, Tower Plating, Fountain regeneration และลำดับการทำลายโครงสร้าง
 - ระบบ Gold, EXP, Level, Respawn, Kill Feed และเงื่อนไขชนะ/แพ้
+- Last Hit ครีปตรวจผู้โจมตีแยกตามทีมและให้ทองเฉพาะฮีโร่ผู้ปิดงาน พร้อมเหรียญ `+Gold` ลอยเหนือจุดตายและเสียงยืนยัน
+- Kill Feed ระบุผู้กำจัด ผู้ถูกกำจัด และทองจาก Hero/Tower reward โดยไม่เพิ่มข้อความจากครีปทุกตัวจนรบกวนการต่อสู้
 
 ### Bot, Shop และ Progression
 
@@ -111,6 +116,7 @@ Project KOA เป็นเกม MOBA แบบ 1v1 บนแผนที่เ
 5. ตรวจ Edge Pan, Space, Y และปุ่ม CAMERA FREE/LOCKED
 6. ตรวจ Mini Map ทั้งย่อ/ขยาย, เลื่อนกล้อง และสั่งเดิน
 7. ตรวจ Tooltip และ Hero Profile ด้วย F1 ที่ความละเอียดหน้าจอจริง
+8. Last Hit ครีปด้วยฮีโร่แล้วตรวจเหรียญ `+Gold`, จากนั้นปล่อยให้ครีปฆ่ากันเพื่อตรวจว่าไม่แจกทอง และตรวจ Hero/Tower reward ใน Kill Feed
 
 ## โครงสร้างโปรเจกต์
 

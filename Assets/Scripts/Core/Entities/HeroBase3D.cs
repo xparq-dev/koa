@@ -43,6 +43,8 @@ namespace KOA.Core.Entities
         // ข้อมูลระบุตัวตนและ ITargetable
         public string HeroId { get; protected set; }
         public string TargetId => HeroId;
+        public string DamageSourceId => $"{HeroId}:team:{TeamId}";
+        public string LastDamageSourceId { get; private set; }
         public string DisplayName { get; protected set; }
         public int TeamId { get; set; } = 0; // 0 = Blue (Player), 1 = Red (Bot)
         public float Radius { get; set; } = 0.8f;
@@ -546,6 +548,7 @@ namespace KOA.Core.Entities
             if (TalentTier3Choice == 1)
                 netDamage *= 0.90f;
 
+            LastDamageSourceId = attackerId;
             CurrentHp = Mathf.Max(0f, CurrentHp - netDamage);
             OnDamageTaken?.Invoke(netDamage, damageType);
             OnHealthChanged?.Invoke(CurrentHp, EffectiveMaxHp);
@@ -566,6 +569,7 @@ namespace KOA.Core.Entities
             Position = respawnPosition;
             CurrentHp = EffectiveMaxHp;
             CurrentMana = EffectiveMaxMana;
+            LastDamageSourceId = null;
             ClearDebuffsAndGrantCrowdControlImmunity(0f);
             CrowdControlImmunityRemaining = 0f;
             InvulnerabilityRemaining = 0f;

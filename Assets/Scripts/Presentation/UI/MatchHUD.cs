@@ -1810,7 +1810,12 @@ namespace KOA.Presentation.UI
             float sy = Time.unscaledTime < _abilityFeedbackExpiresAt ? 87f : 56f;
             Rect firstRow = GetTopCenterNotificationRect(340f, 24f, sy);
             for (int i = 0; i < _killFeed.Count; i++)
-                GUI.Box(new Rect(firstRow.x, sy + (i * 26), firstRow.width, firstRow.height), $"📢 {_killFeed[i]}");
+            {
+                Rect row = new Rect(firstRow.x, sy + (i * 26), firstRow.width, firstRow.height);
+                DrawSolidRect(row, new Color(0.025f, 0.035f, 0.045f, 0.9f));
+                DrawSolidRect(new Rect(row.x, row.y, 3f, row.height), new Color(1f, 0.7f, 0.12f, 0.95f));
+                GUI.Label(new Rect(row.x + 7f, row.y, row.width - 12f, row.height), _killFeed[i], _centerLabel);
+            }
         }
 
         private Rect GetTopCenterNotificationRect(float preferredWidth, float height, float y)

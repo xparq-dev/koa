@@ -109,7 +109,7 @@ namespace KOA.Core.Entities
                 Rotation = Quaternion.LookRotation(new Vector3(lookDir.x, 0, lookDir.z));
             }
 
-            target.TakeDamage(EffectiveAttackDamage, DamageType.Magic, HeroId);
+            target.TakeDamage(EffectiveAttackDamage, DamageType.Magic, DamageSourceId);
             AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
             InvokeBasicAttackExecuted(target.Position);
             return true;
@@ -145,7 +145,7 @@ namespace KOA.Core.Entities
 
             float baseDmg = 70f + (Skill1Rank - 1) * 40f;
             float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.50f));
-            target.TakeDamage(damage, DamageType.Magic, HeroId);
+            target.TakeDamage(damage, DamageType.Magic, DamageSourceId);
 
             OnMagneticPullCast?.Invoke(aimWorldPos);
             return true;
@@ -177,7 +177,7 @@ namespace KOA.Core.Entities
 
                     float baseDmg = 80f + (Skill2Rank - 1) * 45f;
                     float damage = EffectiveSkillDamage(baseDmg + (EffectiveAttackDamage * 0.55f));
-                    target.TakeDamage(damage, DamageType.Magic, HeroId);
+                    target.TakeDamage(damage, DamageType.Magic, DamageSourceId);
                 }
             }
 
@@ -220,7 +220,7 @@ namespace KOA.Core.Entities
                         {
                             hit = true;
                             trackedTargets.Add(t);
-                            t.TakeDamage(damage, DamageType.Magic, HeroId);
+                            t.TakeDamage(damage, DamageType.Magic, DamageSourceId);
                             if (t is HeroBase3D heroTarget)
                                 heroTarget.ApplyMovementSlow(0.50f, 2.5f);
                         }
@@ -276,7 +276,7 @@ namespace KOA.Core.Entities
 
                     float baseDmg = 260f + (UltimateRank - 1) * 130f;
                     float damage = EffectiveSkillDamage(baseDmg + EffectiveAttackDamage);
-                    target.TakeDamage(damage, DamageType.Magic, HeroId);
+                    target.TakeDamage(damage, DamageType.Magic, DamageSourceId);
                 }
             }
 
@@ -383,7 +383,7 @@ namespace KOA.Core.Entities
                     {
                         if (target != null && target.IsAlive && Vector3.Distance(well.Center, target.Position) <= Skill3Radius + target.Radius)
                         {
-                            target.TakeDamage(well.DamagePerTick, DamageType.Magic, HeroId);
+                            target.TakeDamage(well.DamagePerTick, DamageType.Magic, DamageSourceId);
                             if (target is HeroBase3D heroTarget)
                                 heroTarget.ApplyMovementSlow(0.50f, 2.5f);
                         }

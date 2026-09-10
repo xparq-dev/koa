@@ -115,7 +115,7 @@ namespace KOA.Core.Entities
             }
 
             // คำนวณดาเมจ
-            target.TakeDamage(EffectiveAttackDamage, DamageType.Physical, HeroId);
+            target.TakeDamage(EffectiveAttackDamage, DamageType.Physical, DamageSourceId);
             AttackCooldownRemaining = EffectiveAttackCooldownFromBase(BaseAttackCooldown);
             InvokeBasicAttackExecuted(target.Position);
             return true;
@@ -166,7 +166,7 @@ namespace KOA.Core.Entities
                         if (CheckSkillshotLineHit(startPos, endPos, Skill1Width, t.Position, t.Radius))
                         {
                             hit = true;
-                            t.TakeDamage(damage, DamageType.Physical, HeroId);
+                            t.TakeDamage(damage, DamageType.Physical, DamageSourceId);
                         }
                     }
                 }
@@ -224,7 +224,7 @@ namespace KOA.Core.Entities
                         if (dist <= Skill3Radius + t.Radius)
                         {
                             hit = true;
-                            t.TakeDamage(damage, DamageType.Physical, HeroId);
+                            t.TakeDamage(damage, DamageType.Physical, DamageSourceId);
                             if (t is HeroBase3D heroTarget)
                                 heroTarget.ApplyMovementSlow(0.40f, 2.5f);
                         }
@@ -271,7 +271,7 @@ namespace KOA.Core.Entities
                         if (dist <= UltimateRadius + t.Radius)
                         {
                             hit = true;
-                            t.TakeDamage(damage, DamageType.Physical, HeroId);
+                            t.TakeDamage(damage, DamageType.Physical, DamageSourceId);
                             if (t is HeroBase3D heroTarget)
                                 heroTarget.ApplyStun(1.0f);
                         }

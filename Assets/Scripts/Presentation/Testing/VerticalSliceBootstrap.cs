@@ -3,6 +3,7 @@ using KOA.Core.Entities;
 using KOA.Core.Match;
 using KOA.Core.Minions;
 using KOA.Core.Structures;
+using KOA.Core.World;
 using KOA.Presentation.Camera;
 using KOA.Presentation.Arena;
 using KOA.Presentation.Input;
@@ -39,8 +40,8 @@ namespace KOA.Presentation.Testing
         // Respawn System (Fountain Zone: Section 3.1)
         private float _playerRespawnTimer = -1f;
         private float _botRespawnTimer = -1f;
-        private Vector3 _blueFountain = new Vector3(0, 0, -60f);
-        private Vector3 _redFountain = new Vector3(0, 0, 60f);
+        private readonly Vector3 _blueFountain = DuelArenaLayout.BlueFountain;
+        private readonly Vector3 _redFountain = DuelArenaLayout.RedFountain;
         private GameObject _botGo;
         private GameObject _botGoRef;
 
@@ -198,9 +199,14 @@ namespace KOA.Presentation.Testing
             CreateFountainVisual(_blueFountain, "BlueFountain_Zone", new Color(0.15f, 0.5f, 0.95f, 0.4f), 7.5f);
             CreateFountainVisual(_redFountain, "RedFountain_Zone", new Color(0.95f, 0.25f, 0.2f, 0.4f), 7.5f);
 
-            // 2.2 พุ่มไม้ 2 จุดกลางเลน (Section 3.1 Bush Zones)
-            CreateBushVisual(new Vector3(-8f, 0.4f, 0f), new Vector3(3.2f, 0.8f, 9.0f), "Bush_West");
-            CreateBushVisual(new Vector3(8f, 0.4f, 0f), new Vector3(3.2f, 0.8f, 9.0f), "Bush_East");
+            // Principle 4 / Section 3.1: point-symmetric bushes are offset from both
+            // the lane centerline and Duel Plaza sightline to create real ambush choices.
+            Vector3 brushSize = new Vector3(
+                DuelArenaLayout.BrushHalfWidth * 2f,
+                0.8f,
+                DuelArenaLayout.BrushHalfLength * 2f);
+            CreateBushVisual(DuelArenaLayout.BlueBrush + Vector3.up * 0.4f, brushSize, "Bush_BlueSightline");
+            CreateBushVisual(DuelArenaLayout.RedBrush + Vector3.up * 0.4f, brushSize, "Bush_RedSightline");
 
             // 3. DamagePopupManager
             if (FindAnyObjectByType<DamagePopupManager>() == null)
@@ -208,8 +214,9 @@ namespace KOA.Presentation.Testing
                 new GameObject("DamagePopupManager").AddComponent<DamagePopupManager>();
             }
 
-            // 4. Match Simulation (Blue Fountain: Z = -60, Red Fountain: Z = +60)
+            // 4. Match Simulation uses the point-symmetric anchors from Section 3.1.
             MatchSimulation = new MatchSimulation(_blueFountain, _redFountain);
+            MatchSimulation.OnGoldRewardGranted += HandleGoldRewardGranted;
 
             // Hook Minion wave visuals
             MatchSimulation.BlueSpawner.OnWaveSpawned += HandleWaveVisuals;
@@ -343,12 +350,7 @@ namespace KOA.Presentation.Testing
                 {
                     float respawnTime = CurrentPlayerHero.CalculateRespawnTime();
                     _playerRespawnTimer = respawnTime;
-                    // Section 4.1: Kill Gold = 200g base + Streak Bonus ให้ Red Wallet
-                    MatchSimulation?.RedWallet?.RecordHeroKill();
-                    // Section 4.2: EXP ให้แก่ Bot Hero
-                    BotHero?.AddExp(350f);
-                    // Reset Player streak เมื่อตาย
-                    MatchSimulation?.BlueWallet?.RecordDeath();
+                    MatchSimulation?.RecordHeroElimination(CurrentPlayerHero);
                     Debug.Log($"[Bootstrap] Player died. Respawning in {respawnTime:F1}s");
                 }
             };
@@ -429,12 +431,7 @@ namespace KOA.Presentation.Testing
                 {
                     float respawnTime = BotHero.CalculateRespawnTime();
                     _botRespawnTimer = respawnTime;
-                    // Section 4.1: Kill Gold = 200g base + Streak Bonus (RecordHeroKill handles this)
-                    MatchSimulation?.BlueWallet?.RecordHeroKill();
-                    // Section 4.2: EXP เทียบเท่าครีป ~10 ตัว (~350 EXP)
-                    CurrentPlayerHero?.AddExp(350f);
-                    // รีเซ็ต Bot streak เมื่อตาย
-                    MatchSimulation?.RedWallet?.RecordDeath();
+                    MatchSimulation?.RecordHeroElimination(BotHero);
                     Debug.Log($"[Bootstrap] Bot died. Respawning in {respawnTime:F1}s");
                 }
             };
@@ -458,6 +455,13 @@ namespace KOA.Presentation.Testing
         {
             Debug.Log($"[Bootstrap] Switching Bot Hero to: {heroName}");
             SpawnBotHero(heroName);
+        }
+
+        private static void HandleGoldRewardGranted(GoldRewardEvent reward)
+        {
+            // The local player owns Blue Team in the current 1v1 mode.
+            if (reward.RecipientTeamId != 0) return;
+            DamagePopupManager.Instance?.ShowGoldReward(reward.WorldPosition, reward.Amount);
         }
 
         private void HandlePlayAgain()
@@ -571,6 +575,31 @@ namespace KOA.Presentation.Testing
         {
             CreateWorldRing(name, center, radius, color, 0.22f);
             CreateWorldRing($"{name}_Inner", center, 2.6f, new Color(color.r, color.g, color.b, 0.8f), 0.12f);
+
+            // Principle 5: Fountain is the secondary focal light after the Nexus.
+            // Both basin pieces remain inside the Section 3.1 spawn zone.
+            GameObject basin = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            basin.name = $"{name}_PrimitiveBasin";
+            basin.transform.position = center + Vector3.up * 0.08f;
+            basin.transform.localScale = new Vector3(6.7f, 0.12f, 6.7f);
+            basin.GetComponent<Renderer>().material = CreateRuntimeMaterial(new Color(0.12f, 0.16f, 0.18f));
+            Destroy(basin.GetComponent<Collider>());
+
+            GameObject healingPool = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            healingPool.name = $"{name}_GlowingPool";
+            healingPool.transform.position = center + Vector3.up * 0.19f;
+            healingPool.transform.localScale = new Vector3(5.64f, 0.07f, 5.64f);
+            healingPool.GetComponent<Renderer>().material = CreateRuntimeEmissiveMaterial(Color.Lerp(color, Color.white, 0.22f), 3.4f);
+            Destroy(healingPool.GetComponent<Collider>());
+
+            GameObject fountainLightObject = new GameObject($"{name}_FocalLight");
+            fountainLightObject.transform.position = center + Vector3.up * 1.25f;
+            Light fountainLight = fountainLightObject.AddComponent<Light>();
+            fountainLight.type = LightType.Point;
+            fountainLight.color = Color.Lerp(color, Color.white, 0.18f);
+            fountainLight.range = 10.5f;
+            fountainLight.intensity = 3.0f;
+            fountainLight.shadows = LightShadows.None;
 
             Vector3 structurePosition = center + Vector3.forward * Mathf.Sign(center.z) * 3.5f;
             GameObject fountain = CreateDemoObject(
@@ -732,8 +761,20 @@ namespace KOA.Presentation.Testing
             beacon.transform.localScale = Vector3.one * (isNexus ? 0.58f : 0.28f);
             Destroy(beacon.GetComponent<Collider>());
 
-            Material material = CreateRuntimeMaterial(Color.Lerp(color, Color.white, 0.28f));
+            bool isInnerTower = structureName.Contains("Inner");
+            float emission = isNexus ? 5.2f : isInnerTower ? 2.0f : 1.55f;
+            Material material = CreateRuntimeEmissiveMaterial(Color.Lerp(color, Color.white, 0.28f), emission);
             beacon.GetComponent<Renderer>().material = material;
+
+            GameObject focalLightObject = new GameObject($"{structureName}_FocalLight");
+            focalLightObject.transform.SetParent(parent, false);
+            focalLightObject.transform.localPosition = new Vector3(0f, height, 0f);
+            Light focalLight = focalLightObject.AddComponent<Light>();
+            focalLight.type = LightType.Point;
+            focalLight.color = Color.Lerp(color, Color.white, 0.18f);
+            focalLight.range = isNexus ? 13.5f : isInnerTower ? 7.5f : 6.5f;
+            focalLight.intensity = isNexus ? 4.6f : isInnerTower ? 1.55f : 1.2f;
+            focalLight.shadows = LightShadows.None;
 
             GameObject crown = new GameObject($"{structureName}_Crown");
             crown.transform.SetParent(parent, false);
@@ -826,6 +867,17 @@ namespace KOA.Presentation.Testing
             Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             Material material = new Material(shader);
             material.color = color;
+            return material;
+        }
+
+        private static Material CreateRuntimeEmissiveMaterial(Color color, float intensity)
+        {
+            Material material = CreateRuntimeMaterial(color);
+            if (material.HasProperty("_EmissionColor"))
+            {
+                material.SetColor("_EmissionColor", color * intensity);
+                material.EnableKeyword("_EMISSION");
+            }
             return material;
         }
 

@@ -16,6 +16,9 @@ namespace KOA.Presentation.UI
         private float _currentTimer = 0f;
         private Color _initialColor;
         private UnityEngine.Camera _mainCamera;
+        private Transform _coinVisual;
+        private Material _coinMaterial;
+        private bool _isGoldReward;
 
         private void Awake()
         {
@@ -61,6 +64,49 @@ namespace KOA.Presentation.UI
             _currentTimer = lifetime;
         }
 
+        public void SetupGold(int amount)
+        {
+            if (textMesh == null) Awake();
+
+            _isGoldReward = true;
+            lifetime = 1.15f;
+            floatSpeed = 1.45f;
+            _initialColor = new Color(1f, 0.82f, 0.18f);
+            textMesh.text = $"+{amount}g";
+            textMesh.fontSize = 30;
+            textMesh.fontStyle = FontStyle.Bold;
+            textMesh.characterSize = 0.075f;
+            textMesh.color = _initialColor;
+            _currentTimer = lifetime;
+            CreateCoinVisual();
+        }
+
+        private void CreateCoinVisual()
+        {
+            GameObject coin = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            coin.name = "KOA_GoldCoin";
+            coin.transform.SetParent(transform, false);
+            coin.transform.localPosition = new Vector3(-0.52f, 0f, 0.04f);
+            coin.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            coin.transform.localScale = new Vector3(0.22f, 0.045f, 0.22f);
+            Collider coinCollider = coin.GetComponent<Collider>();
+            if (coinCollider != null) Destroy(coinCollider);
+
+            Renderer coinRenderer = coin.GetComponent<Renderer>();
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (coinRenderer != null && shader != null)
+            {
+                _coinMaterial = new Material(shader);
+                Color gold = new Color(1f, 0.63f, 0.04f);
+                _coinMaterial.color = gold;
+                if (_coinMaterial.HasProperty("_BaseColor")) _coinMaterial.SetColor("_BaseColor", gold);
+                if (_coinMaterial.HasProperty("_Metallic")) _coinMaterial.SetFloat("_Metallic", 0.72f);
+                if (_coinMaterial.HasProperty("_Smoothness")) _coinMaterial.SetFloat("_Smoothness", 0.8f);
+                coinRenderer.material = _coinMaterial;
+            }
+            _coinVisual = coin.transform;
+        }
+
         private void LateUpdate()
         {
             if (_mainCamera != null)
@@ -70,6 +116,16 @@ namespace KOA.Presentation.UI
 
             // ลอยขึ้นเรื่อยๆ
             transform.position += Vector3.up * (floatSpeed * Time.deltaTime);
+            if (_coinVisual != null)
+            {
+                _coinVisual.Rotate(Vector3.up, 420f * Time.deltaTime, Space.Self);
+                if (_isGoldReward)
+                {
+                    float progress = 1f - Mathf.Clamp01(_currentTimer / lifetime);
+                    float popScale = Mathf.Lerp(0.55f, 1f, Mathf.Clamp01(progress * 5f));
+                    _coinVisual.localScale = new Vector3(0.22f, 0.045f, 0.22f) * popScale;
+                }
+            }
 
             // ค่อยๆ จางลง
             _currentTimer -= Time.deltaTime;
@@ -84,6 +140,11 @@ namespace KOA.Presentation.UI
             {
                 Destroy(gameObject);
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (_coinMaterial != null) Destroy(_coinMaterial);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using KOA.Core.World;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -23,9 +24,12 @@ namespace KOA.Presentation.Arena
         private Material _cloudMaterial;
         private Material _cloudBankMaterial;
         private Material _foamMaterial;
+        private Material _blueAccentMaterial;
+        private Material _redAccentMaterial;
         private readonly List<Transform> _clouds = new List<Transform>();
         private readonly List<float> _cloudSpeeds = new List<float>();
         private readonly List<Texture2D> _runtimeTextures = new List<Texture2D>();
+        private readonly List<TerrainData> _runtimeTerrainData = new List<TerrainData>();
         private bool _built;
 
         public void BuildArena()
@@ -36,6 +40,7 @@ namespace KOA.Presentation.Arena
             _arenaRoot = new GameObject("BridgeArena_Art").transform;
             _arenaRoot.SetParent(transform, false);
 
+            CreateDesignPrincipleMarkers();
             LoadMaterials();
             ConfigureImageQualityAndAtmosphere();
             CreateChasm();
@@ -43,12 +48,32 @@ namespace KOA.Presentation.Arena
             CreateWaterfalls();
             CreateCloudLayer();
             CreateBridgeDeck();
+            CreateTerrainDetailGrass();
             CreateBridgeApproachOverscan();
             CreateBridgeSupports();
             CreateAbyssFraming();
+            CreateSpawnFortresses();
             CreateBrokenParapets();
             CreateDenseForest();
             CreateBraziers();
+        }
+
+        private void CreateDesignPrincipleMarkers()
+        {
+            string[] notes =
+            {
+                "[P1] Point Symmetry - gameplay anchors mirror through world origin",
+                "[P2] Rhythmic Spacing - structure gaps tighten toward Duel Plaza",
+                "[P3] Occlusion Framing - cliff height and canopy rhythm vary by segment",
+                "[P4] Sightline Bushes - brush zones sit off lane centerline",
+                "[P5] Focal Lighting - Nexus brightest, Fountain second, Towers third"
+            };
+
+            foreach (string note in notes)
+            {
+                Transform marker = new GameObject(note).transform;
+                marker.SetParent(_arenaRoot, false);
+            }
         }
 
         private void LoadMaterials()
@@ -69,6 +94,8 @@ namespace KOA.Presentation.Arena
             _cloudMaterial = CreateTransparentMaterial(new Color(0.62f, 0.70f, 0.74f, 0.18f), cloudTexture);
             _cloudBankMaterial = CreateTransparentMaterial(new Color(0.24f, 0.31f, 0.36f, 0.30f), cloudTexture);
             _foamMaterial = CreateTransparentMaterial(new Color(0.76f, 0.90f, 0.90f, 0.42f), cloudTexture);
+            _blueAccentMaterial = CreateEmissiveMaterial(new Color(0.08f, 0.62f, 1f), 2.2f);
+            _redAccentMaterial = CreateEmissiveMaterial(new Color(1f, 0.20f, 0.08f), 2.2f);
         }
 
         private void ConfigureImageQualityAndAtmosphere()
@@ -119,11 +146,113 @@ namespace KOA.Presentation.Arena
                 false);
             voidFloor.transform.SetParent(_arenaRoot, true);
 
-            CreatePrimitive("CliffFace_West", PrimitiveType.Cube, new Vector3(-13.25f, -4.35f, 0f), new Vector3(1.25f, 8.7f, 130f), _cliffMaterial, false);
-            CreatePrimitive("CliffFace_East", PrimitiveType.Cube, new Vector3(13.25f, -4.35f, 0f), new Vector3(1.25f, 8.7f, 130f), _cliffMaterial, false);
+            CreateSerialVisionCliffs();
 
             CreateMistRibbon("ChasmMist_West", new Vector3(-31f, -8.9f, 0f));
             CreateMistRibbon("ChasmMist_East", new Vector3(31f, -8.9f, 0f));
+        }
+
+        private void CreateSerialVisionCliffs()
+        {
+            // Principle 3: one authored edge is mirrored across the map origin. Segment
+            // lengths and drops vary, avoiding the flat-wall silhouette that removes depth.
+            float[] lengths = { 12f, 10f, 13f, 11f, 12f, 14f, 9f, 13f, 11f, 12f, 13f };
+            float[] heights = { 6.2f, 8.8f, 5.4f, 9.6f, 7.2f, 10.4f, 6.7f, 8.1f, 5.9f, 9.1f, 7.5f };
+            float cursor = -ArenaBounds.HalfLength;
+
+            for (int i = 0; i < lengths.Length; i++)
+            {
+                float length = lengths[i];
+                float height = heights[i];
+                float centerZ = cursor + length * 0.5f;
+                Vector3 westPosition = new Vector3(-13.25f, 0.05f - height * 0.5f, centerZ);
+                Vector3 eastPosition = DuelArenaLayout.MirrorPoint(westPosition);
+                Vector3 faceScale = new Vector3(1.25f, height, length + 0.08f);
+
+                CreatePrimitive($"[P3]_Cliff_West_{i + 1}", PrimitiveType.Cube, westPosition, faceScale, _cliffMaterial, false);
+                CreatePrimitive($"[P3]_Cliff_East_{lengths.Length - i}", PrimitiveType.Cube, eastPosition, faceScale, _cliffMaterial, false);
+
+                Vector3 westCrown = new Vector3(westPosition.x, 0.03f, centerZ);
+                Vector3 eastCrown = DuelArenaLayout.MirrorPoint(westCrown);
+                Vector3 crownScale = new Vector3(1.62f, 0.24f + (i % 3) * 0.07f, length + 0.12f);
+                CreatePrimitive($"[P3]_CliffCrown_West_{i + 1}", PrimitiveType.Cube, westCrown, crownScale, _cliffMaterial, false);
+                CreatePrimitive($"[P3]_CliffCrown_East_{lengths.Length - i}", PrimitiveType.Cube, eastCrown, crownScale, _cliffMaterial, false);
+
+                cursor += length;
+            }
+        }
+
+        private void CreateTerrainDetailGrass()
+        {
+            // Principle 3: Unity Terrain Detail grass adds low-cost micro-depth on both
+            // shoulders. The second density map is a 180-degree mirror of the first.
+            const int resolution = 128;
+            Texture2D grassBlade = CreateGrassBladeTexture();
+            int[,] westDensity = new int[resolution, resolution];
+            int[,] eastDensity = new int[resolution, resolution];
+
+            for (int z = 0; z < resolution; z++)
+            {
+                float normalizedZ = z / (float)(resolution - 1);
+                float worldZ = Mathf.Lerp(-ArenaBounds.HalfLength, ArenaBounds.HalfLength, normalizedZ);
+                float thirdRhythm = Mathf.Max(
+                    Mathf.Exp(-Mathf.Pow((normalizedZ - 0.17f) / 0.11f, 2f)),
+                    Mathf.Max(
+                        Mathf.Exp(-Mathf.Pow((normalizedZ - 0.50f) / 0.13f, 2f)),
+                        Mathf.Exp(-Mathf.Pow((normalizedZ - 0.83f) / 0.11f, 2f))));
+
+                for (int x = 0; x < resolution; x++)
+                {
+                    float noise = Mathf.PerlinNoise(x * 0.19f + 2.7f, z * 0.13f + 6.1f);
+                    bool clearForObjective = IsReservedStructureZone(worldZ) && x > resolution * 0.55f;
+                    int density = !clearForObjective && noise + thirdRhythm * 0.36f > 0.82f ? (noise > 0.72f ? 2 : 1) : 0;
+                    westDensity[z, x] = density;
+                    eastDensity[resolution - 1 - z, resolution - 1 - x] = density;
+                }
+            }
+
+            CreateGrassTerrain("[P3]_TerrainDetailGrass_West", new Vector3(-13f, 0.026f, -65f), grassBlade, westDensity);
+            CreateGrassTerrain("[P3]_TerrainDetailGrass_East", new Vector3(6.5f, 0.026f, -65f), grassBlade, eastDensity);
+        }
+
+        private void CreateGrassTerrain(string name, Vector3 origin, Texture2D grassBlade, int[,] density)
+        {
+            var terrainData = new TerrainData
+            {
+                name = $"{name}_RuntimeData",
+                heightmapResolution = 33,
+                size = new Vector3(6.5f, 0.4f, 130f)
+            };
+            terrainData.SetDetailResolution(density.GetLength(0), 16);
+            terrainData.detailPrototypes = new[]
+            {
+                new DetailPrototype
+                {
+                    prototypeTexture = grassBlade,
+                    renderMode = DetailRenderMode.GrassBillboard,
+                    healthyColor = new Color(0.30f, 0.52f, 0.20f),
+                    dryColor = new Color(0.34f, 0.30f, 0.15f),
+                    minWidth = 0.12f,
+                    maxWidth = 0.28f,
+                    minHeight = 0.28f,
+                    maxHeight = 0.62f,
+                    noiseSpread = 0.35f
+                }
+            };
+            terrainData.SetDetailLayer(0, 0, 0, density);
+            _runtimeTerrainData.Add(terrainData);
+
+            // Create only the visual Terrain component. Terrain.CreateTerrainGameObject also
+            // creates a TerrainCollider and would require the optional Terrain Physics module.
+            GameObject terrainObject = new GameObject(name);
+            terrainObject.transform.SetParent(_arenaRoot, false);
+            terrainObject.transform.position = origin;
+            Terrain terrain = terrainObject.AddComponent<Terrain>();
+            terrain.terrainData = terrainData;
+            terrain.drawInstanced = true;
+            terrain.detailObjectDensity = 0.72f;
+            terrain.detailObjectDistance = 42f;
+            terrain.basemapDistance = 45f;
         }
 
         private void CreateLowerValley()
@@ -155,55 +284,77 @@ namespace KOA.Presentation.Arena
 
         private void CreateWaterfalls()
         {
-            float[] waterfallZ = { -39f, 7f, 43f };
-            int waterfallIndex = 0;
-            foreach (float z in waterfallZ)
+            // A paired fall at the Duel Plaza reinforces the center focal line. The outer
+            // pair is point-symmetric, preserving team readability without blocking play.
+            CreateWaterfall(1, -1, 0f);
+            CreateWaterfall(2, 1, 0f);
+            CreateWaterfall(3, -1, -38f);
+            CreateWaterfall(4, 1, 38f);
+        }
+
+        private void CreateWaterfall(int waterfallIndex, int side, float z)
+        {
+            float edgeX = side * 11.95f;
+            GameObject feed = CreatePrimitive($"WaterfallFeed_{waterfallIndex}", PrimitiveType.Plane,
+                new Vector3(edgeX, 0.185f, z), new Vector3(0.28f, 1f, 0.16f), _waterMaterial, false);
+            DisableShadows(feed);
+
+            for (int ribbon = -1; ribbon <= 1; ribbon++)
             {
-                int side = (waterfallIndex & 1) == 0 ? -1 : 1;
-                float edgeX = side * 11.95f;
-                GameObject feed = CreatePrimitive($"WaterfallFeed_{waterfallIndex + 1}", PrimitiveType.Plane,
-                    new Vector3(edgeX, 0.185f, z), new Vector3(0.28f, 1f, 0.16f), _waterMaterial, false);
-                DisableShadows(feed);
-
-                for (int ribbon = -1; ribbon <= 1; ribbon++)
-                {
-                    GameObject drop = CreatePrimitive($"WaterfallDrop_{waterfallIndex + 1}_{ribbon + 2}", PrimitiveType.Quad,
-                        new Vector3(side * (13.47f + ribbon * 0.035f), -4.1f, z + ribbon * 0.46f),
-                        new Vector3(ribbon == 0 ? 0.92f : 0.64f, 7.9f, 1f), _waterMaterial, false);
-                    drop.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
-                    DisableShadows(drop);
-                }
-
-                GameObject pool = CreatePrimitive($"WaterfallPool_{waterfallIndex + 1}", PrimitiveType.Plane,
-                    new Vector3(side * 18.5f, -8.25f, z), new Vector3(0.46f, 1f, 0.36f), _waterMaterial, false);
-                GameObject edgeFoam = CreatePrimitive($"WaterfallEdgeFoam_{waterfallIndex + 1}", PrimitiveType.Plane,
-                    new Vector3(side * 12.86f, 0.205f, z), new Vector3(0.18f, 1f, 0.12f), _foamMaterial, false);
-                GameObject poolFoam = CreatePrimitive($"WaterfallPoolFoam_{waterfallIndex + 1}", PrimitiveType.Plane,
-                    new Vector3(side * 16.05f, -8.20f, z), new Vector3(0.28f, 1f, 0.22f), _foamMaterial, false);
-                DisableShadows(pool);
-                DisableShadows(edgeFoam);
-                DisableShadows(poolFoam);
-                waterfallIndex++;
+                GameObject drop = CreatePrimitive($"WaterfallDrop_{waterfallIndex}_{ribbon + 2}", PrimitiveType.Quad,
+                    new Vector3(side * (13.47f + ribbon * 0.035f), -4.1f, z + ribbon * 0.46f),
+                    new Vector3(ribbon == 0 ? 0.92f : 0.64f, 7.9f, 1f), _waterMaterial, false);
+                drop.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
+                DisableShadows(drop);
             }
+
+            GameObject pool = CreatePrimitive($"WaterfallPool_{waterfallIndex}", PrimitiveType.Plane,
+                new Vector3(side * 18.5f, -8.25f, z), new Vector3(0.46f, 1f, 0.36f), _waterMaterial, false);
+            GameObject edgeFoam = CreatePrimitive($"WaterfallEdgeFoam_{waterfallIndex}", PrimitiveType.Plane,
+                new Vector3(side * 12.86f, 0.205f, z), new Vector3(0.18f, 1f, 0.12f), _foamMaterial, false);
+            GameObject poolFoam = CreatePrimitive($"WaterfallPoolFoam_{waterfallIndex}", PrimitiveType.Plane,
+                new Vector3(side * 16.05f, -8.20f, z), new Vector3(0.28f, 1f, 0.22f), _foamMaterial, false);
+            DisableShadows(pool);
+            DisableShadows(edgeFoam);
+            DisableShadows(poolFoam);
         }
 
         private void CreateCloudLayer()
         {
             var random = new System.Random(1209);
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 4; i++)
             {
-                int side = random.Next(0, 2) == 0 ? -1 : 1;
-                GameObject cloud = CreatePrimitive(
-                    $"ChasmCloud_{i + 1}",
+                Vector3 bluePosition = new Vector3(
+                    -NextRange(random, 27f, 42f),
+                    NextRange(random, -8.0f, -6.8f),
+                    NextRange(random, -68f, 12f));
+                Vector3 redPosition = DuelArenaLayout.MirrorPoint(bluePosition);
+                Vector3 scale = new Vector3(NextRange(random, 0.85f, 1.55f), 1f, NextRange(random, 0.42f, 0.82f));
+                float yaw = NextRange(random, -18f, 18f);
+                float speed = NextRange(random, 0.12f, 0.28f);
+
+                GameObject blueCloud = CreatePrimitive(
+                    $"ChasmCloud_Blue_{i + 1}",
                     PrimitiveType.Plane,
-                    new Vector3(side * NextRange(random, 27f, 42f), NextRange(random, -8.0f, -6.8f), NextRange(random, -72f, 72f)),
-                    new Vector3(NextRange(random, 0.85f, 1.55f), 1f, NextRange(random, 0.42f, 0.82f)),
+                    bluePosition,
+                    scale,
                     _cloudMaterial,
                     false);
-                cloud.transform.rotation = Quaternion.Euler(0f, NextRange(random, -18f, 18f), 0f);
-                DisableShadows(cloud);
-                _clouds.Add(cloud.transform);
-                _cloudSpeeds.Add(NextRange(random, 0.12f, 0.28f));
+                GameObject redCloud = CreatePrimitive(
+                    $"ChasmCloud_Red_{i + 1}",
+                    PrimitiveType.Plane,
+                    redPosition,
+                    scale,
+                    _cloudMaterial,
+                    false);
+                blueCloud.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+                redCloud.transform.rotation = Quaternion.Euler(0f, yaw + 180f, 0f);
+                DisableShadows(blueCloud);
+                DisableShadows(redCloud);
+                _clouds.Add(blueCloud.transform);
+                _cloudSpeeds.Add(speed);
+                _clouds.Add(redCloud.transform);
+                _cloudSpeeds.Add(-speed);
             }
         }
 
@@ -409,6 +560,54 @@ namespace KOA.Presentation.Arena
             }
         }
 
+        private void CreateSpawnFortresses()
+        {
+            // Principles 1 and 5: the Blue fortress is authored once; every Red piece is
+            // derived by point symmetry. Walls frame each Nexus without adding gameplay
+            // colliders, so the Core remains the sole owner of movement bounds.
+            Vector3 wallScale = new Vector3(1.05f, 3.0f, 24f);
+            CreateTeamMirroredPrimitivePair("SpawnWall_OuterLeft", PrimitiveType.Cube, new Vector3(-10.8f, 1.48f, -49f), wallScale, _cliffMaterial, _cliffMaterial);
+            CreateTeamMirroredPrimitivePair("SpawnWall_OuterRight", PrimitiveType.Cube, new Vector3(10.8f, 1.48f, -49f), wallScale, _cliffMaterial, _cliffMaterial);
+
+            CreateTeamMirroredPrimitivePair("NexusWall_Left", PrimitiveType.Cube, new Vector3(-7.8f, 0.78f, -40f), new Vector3(1.2f, 1.55f, 7.2f), _cliffMaterial, _cliffMaterial);
+            CreateTeamMirroredPrimitivePair("NexusWall_Right", PrimitiveType.Cube, new Vector3(7.8f, 0.78f, -40f), new Vector3(1.2f, 1.55f, 7.2f), _cliffMaterial, _cliffMaterial);
+
+            CreateTeamMirroredPrimitivePair("GateWing_Left", PrimitiveType.Cube, new Vector3(-8.0f, 1.75f, -63.2f), new Vector3(5.6f, 3.5f, 1.1f), _cliffMaterial, _cliffMaterial);
+            CreateTeamMirroredPrimitivePair("GateWing_Right", PrimitiveType.Cube, new Vector3(8.0f, 1.75f, -63.2f), new Vector3(5.6f, 3.5f, 1.1f), _cliffMaterial, _cliffMaterial);
+            CreateTeamMirroredPrimitivePair("GatePillar_Left", PrimitiveType.Cube, new Vector3(-5.0f, 2.35f, -63.0f), new Vector3(1.0f, 4.7f, 1.25f), _cliffMaterial, _cliffMaterial);
+            CreateTeamMirroredPrimitivePair("GatePillar_Right", PrimitiveType.Cube, new Vector3(5.0f, 2.35f, -63.0f), new Vector3(1.0f, 4.7f, 1.25f), _cliffMaterial, _cliffMaterial);
+            CreateTeamMirroredPrimitivePair("GateLintel", PrimitiveType.Cube, new Vector3(0f, 4.55f, -63.0f), new Vector3(9.2f, 0.72f, 1.2f), _cliffMaterial, _cliffMaterial);
+
+            Vector3 towerScale = new Vector3(2.1f, 1.85f, 2.1f);
+            Vector3 crystalScale = new Vector3(0.52f, 0.86f, 0.52f);
+            Vector3[] blueTowerPositions =
+            {
+                new Vector3(-10.7f, 1.85f, -40.5f),
+                new Vector3(10.7f, 1.85f, -40.5f),
+                new Vector3(-10.7f, 1.85f, -59.5f),
+                new Vector3(10.7f, 1.85f, -59.5f)
+            };
+            for (int i = 0; i < blueTowerPositions.Length; i++)
+            {
+                Vector3 towerPosition = blueTowerPositions[i];
+                CreateTeamMirroredPrimitivePair($"FortressTurret_{i + 1}", PrimitiveType.Cylinder, towerPosition, towerScale, _cliffMaterial, _cliffMaterial);
+                CreateTeamMirroredPrimitivePair($"FortressCrystal_{i + 1}", PrimitiveType.Sphere, towerPosition + Vector3.up * 2.75f, crystalScale, _blueAccentMaterial, _redAccentMaterial);
+            }
+        }
+
+        private void CreateTeamMirroredPrimitivePair(
+            string name,
+            PrimitiveType primitiveType,
+            Vector3 bluePosition,
+            Vector3 scale,
+            Material blueMaterial,
+            Material redMaterial)
+        {
+            CreatePrimitive($"[P1]_Blue_{name}", primitiveType, bluePosition, scale, blueMaterial, false);
+            GameObject red = CreatePrimitive($"[P1]_Red_{name}", primitiveType, DuelArenaLayout.MirrorPoint(bluePosition), scale, redMaterial, false);
+            red.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+        }
+
         private void CreateBrokenParapets()
         {
             var random = new System.Random(3108);
@@ -438,36 +637,40 @@ namespace KOA.Presentation.Arena
             GameObject cliffRock = Resources.Load<GameObject>("KOA/Demo/Environment_CliffRock");
             var random = new System.Random(7751);
 
-            for (int i = 0; i < 34; i++)
+            // Principle 3: clusters land around longitudinal thirds with irregular gaps
+            // and alternating scale. Each authored cluster receives a point-symmetric pair.
+            float[] clusterAnchors = { -53f, -43f, -19f, 4f, 27f, 45f, 57f };
+            int treeIndex = 0;
+            for (int cluster = 0; cluster < clusterAnchors.Length; cluster++)
             {
-                float z = NextRange(random, -61f, 61f);
-                if (IsReservedStructureZone(z)) continue;
-                int side = random.Next(0, 2) == 0 ? -1 : 1;
-                Vector3 position = new Vector3(side * NextRange(random, 9.4f, 11.7f), 0.055f, z);
-                SpawnDecoration(treePrefabs, $"ForestTree_{i + 1}", position, random, NextRange(random, 0.68f, 1.02f));
-            }
-
-            for (int i = 0; i < 96; i++)
-            {
-                int side = random.Next(0, 2) == 0 ? -1 : 1;
-                Vector3 position = new Vector3(side * NextRange(random, 6.6f, 12.0f), 0.025f, NextRange(random, -63f, 63f));
-                SpawnDecoration(groundPrefabs, $"ForestGround_{i + 1}", position, random, NextRange(random, 0.65f, 1.35f));
-            }
-
-            for (int i = 0; i < 20; i++)
-            {
-                int side = random.Next(0, 2) == 0 ? -1 : 1;
-                Vector3 position = new Vector3(side * NextRange(random, 8.3f, 12.1f), 0.055f, NextRange(random, -61f, 61f));
-                SpawnDecoration(smallRockPrefabs, $"ForestStone_{i + 1}", position, random, NextRange(random, 0.28f, 0.55f));
-            }
-
-            for (int z = -62, index = 0; z <= 62; z += 5, index++)
-            {
-                for (int side = -1; side <= 1; side += 2)
+                int count = 2 + (cluster % 3);
+                for (int item = 0; item < count; item++)
                 {
-                    Vector3 position = new Vector3(side * NextRange(random, 13.05f, 13.55f), -1.15f, z + NextRange(random, -1.4f, 1.4f));
-                    SpawnDecoration(cliffRock != null ? new[] { cliffRock } : smallRockPrefabs, $"CliffRock_{side}_{index}", position, random, NextRange(random, 0.36f, 0.62f));
+                    float z = clusterAnchors[cluster] + NextRange(random, -3.1f, 3.1f);
+                    if (IsReservedStructureZone(z)) continue;
+                    Vector3 bluePosition = new Vector3(-NextRange(random, 9.1f, 11.8f), 0.055f, z);
+                    float scale = NextRange(random, 0.62f, 1.12f) * (item == 0 ? 1.14f : 0.92f);
+                    SpawnPointSymmetricDecorationPair(treePrefabs, $"[P3]_ForestTree_{++treeIndex}", bluePosition, random, scale);
                 }
+            }
+
+            for (int i = 0; i < 46; i++)
+            {
+                Vector3 bluePosition = new Vector3(-NextRange(random, 6.7f, 12.0f), 0.025f, NextRange(random, -62f, 62f));
+                SpawnPointSymmetricDecorationPair(groundPrefabs, $"TerrainGroundCover_{i + 1}", bluePosition, random, NextRange(random, 0.62f, 1.28f));
+            }
+
+            for (int i = 0; i < 12; i++)
+            {
+                Vector3 bluePosition = new Vector3(-NextRange(random, 8.4f, 12.0f), 0.055f, NextRange(random, -59f, 59f));
+                SpawnPointSymmetricDecorationPair(smallRockPrefabs, $"ForestStone_{i + 1}", bluePosition, random, NextRange(random, 0.28f, 0.58f));
+            }
+
+            GameObject[] edgeRocks = cliffRock != null ? new[] { cliffRock } : smallRockPrefabs;
+            for (int z = -60, index = 0; z <= 60; z += 6, index++)
+            {
+                Vector3 bluePosition = new Vector3(-NextRange(random, 13.05f, 13.55f), -1.15f, z + NextRange(random, -1.1f, 1.1f));
+                SpawnPointSymmetricDecorationPair(edgeRocks, $"CliffRock_{index + 1}", bluePosition, random, NextRange(random, 0.34f, 0.66f));
             }
         }
 
@@ -475,10 +678,35 @@ namespace KOA.Presentation.Arena
         {
             float absoluteZ = Mathf.Abs(z);
             return absoluteZ < 6f
-                || Mathf.Abs(absoluteZ - 14f) < 4f
-                || Mathf.Abs(absoluteZ - 32f) < 4f
-                || Mathf.Abs(absoluteZ - 46f) < 4f
-                || Mathf.Abs(absoluteZ - 60f) < 3f;
+                || Mathf.Abs(absoluteZ - DuelArenaLayout.OuterTowerZ) < 3.5f
+                || Mathf.Abs(absoluteZ - DuelArenaLayout.InnerTowerZ) < 3.5f
+                || Mathf.Abs(absoluteZ - DuelArenaLayout.NexusZ) < 4f
+                || Mathf.Abs(absoluteZ - DuelArenaLayout.FountainZ) < 4f;
+        }
+
+        private void SpawnPointSymmetricDecorationPair(
+            GameObject[] prefabs,
+            string name,
+            Vector3 bluePosition,
+            System.Random random,
+            float scale)
+        {
+            if (prefabs == null || prefabs.Length == 0) return;
+            GameObject source = prefabs[random.Next(0, prefabs.Length)];
+            if (source == null) return;
+
+            float yaw = NextRange(random, 0f, 360f);
+            SpawnDecorationInstance(source, $"{name}_Blue", bluePosition, yaw, scale);
+            SpawnDecorationInstance(source, $"{name}_Red", DuelArenaLayout.MirrorPoint(bluePosition), yaw + 180f, scale);
+        }
+
+        private void SpawnDecorationInstance(GameObject source, string name, Vector3 position, float yaw, float scale)
+        {
+            GameObject instance = Instantiate(source, position, Quaternion.Euler(0f, yaw, 0f), _arenaRoot);
+            instance.name = name;
+            instance.transform.localScale = Vector3.one * scale;
+            foreach (Collider collider in instance.GetComponentsInChildren<Collider>(true))
+                Destroy(collider);
         }
 
         private void SpawnDecoration(GameObject[] prefabs, string name, Vector3 position, System.Random random, float scale)
@@ -645,6 +873,35 @@ namespace KOA.Presentation.Arena
             }
         }
 
+        private Texture2D CreateGrassBladeTexture()
+        {
+            const int size = 32;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, true)
+            {
+                name = "KOA_Runtime_TerrainGrassBlade",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float vertical = (y + 0.5f) / size;
+                float halfWidth = Mathf.Lerp(0.34f, 0.035f, vertical);
+                float baseFade = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(vertical / 0.12f));
+                for (int x = 0; x < size; x++)
+                {
+                    float horizontal = Mathf.Abs(((x + 0.5f) / size) * 2f - 1f);
+                    float alpha = Mathf.Clamp01((halfWidth - horizontal) * 20f) * baseFade;
+                    float highlight = Mathf.Lerp(0.72f, 1f, vertical);
+                    pixels[y * size + x] = new Color(0.42f * highlight, 0.78f * highlight, 0.28f * highlight, alpha);
+                }
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(true, false);
+            _runtimeTextures.Add(texture);
+            return texture;
+        }
+
         private Texture2D CreateWaterTexture()
         {
             const int size = 128;
@@ -726,8 +983,10 @@ namespace KOA.Presentation.Arena
                 Transform cloud = _clouds[i];
                 if (cloud == null) continue;
                 cloud.position += Vector3.forward * (_cloudSpeeds[i] * Time.deltaTime);
-                if (cloud.position.z > 78f)
+                if (_cloudSpeeds[i] >= 0f && cloud.position.z > 78f)
                     cloud.position = new Vector3(cloud.position.x, cloud.position.y, -78f);
+                else if (_cloudSpeeds[i] < 0f && cloud.position.z < -78f)
+                    cloud.position = new Vector3(cloud.position.x, cloud.position.y, 78f);
             }
         }
 
@@ -761,6 +1020,12 @@ namespace KOA.Presentation.Arena
                 if (texture != null) Destroy(texture);
             }
             _runtimeTextures.Clear();
+
+            foreach (TerrainData terrainData in _runtimeTerrainData)
+            {
+                if (terrainData != null) Destroy(terrainData);
+            }
+            _runtimeTerrainData.Clear();
         }
     }
 }

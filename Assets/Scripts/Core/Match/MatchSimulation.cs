@@ -2,6 +2,7 @@ using KOA.Core.Economy;
 using KOA.Core.Entities;
 using KOA.Core.Minions;
 using KOA.Core.Structures;
+using KOA.Core.World;
 using KOA.Data.Models;
 using System;
 using System.Collections.Generic;
@@ -9,6 +10,39 @@ using UnityEngine;
 
 namespace KOA.Core.Match
 {
+    public enum GoldRewardReason
+    {
+        MinionLastHit = 0,
+        HeroElimination = 1,
+        StructureDestroyed = 2
+    }
+
+    public readonly struct GoldRewardEvent
+    {
+        public int RecipientTeamId { get; }
+        public int Amount { get; }
+        public Vector3 WorldPosition { get; }
+        public GoldRewardReason Reason { get; }
+        public string SourceId { get; }
+        public string DefeatedTargetId { get; }
+
+        public GoldRewardEvent(
+            int recipientTeamId,
+            int amount,
+            Vector3 worldPosition,
+            GoldRewardReason reason,
+            string sourceId,
+            string defeatedTargetId)
+        {
+            RecipientTeamId = recipientTeamId;
+            Amount = amount;
+            WorldPosition = worldPosition;
+            Reason = reason;
+            SourceId = sourceId;
+            DefeatedTargetId = defeatedTargetId;
+        }
+    }
+
     /// <summary>
     /// ผู้จัดการจำลองแมตช์ 1v1 ในระดับสนามแข่งขัน (Simulation Core)
     /// ควบคุมป้อมปราการ 2 Tier + Nexus (Section 3.3), ครีป (Section 3.2), ระบบต่อสู้, เศรษฐกิจ (Section 4), และการตัดสินผลแพ้ชนะ
@@ -48,6 +82,7 @@ namespace KOA.Core.Match
         public event Action<int> OnGameOver; // winningTeam
         public event Action<TowerEntity> OnTowerDestroyed;
         public event Action<string> OnKillFeedMessage;
+        public event Action<GoldRewardEvent> OnGoldRewardGranted;
 
         // ตำแหน่ง Fountain Zone (Section 3.1: รัศมี 7.5m, HP/Mana Regen ~11%/sec ตาม MOBA Standard)
         public Vector3 BlueFountainPos { get; private set; }
@@ -56,17 +91,24 @@ namespace KOA.Core.Match
 
         public MatchSimulation(Vector3 blueFountainPos, Vector3 redFountainPos)
         {
-            // สร้างป้อมปราการฝั่ง Blue (แผนที่ 130m: Z = -65 ถึง +65)
-            // Outer Tower: -14m, Inner Tower: -32m (ห่าง 18m), Nexus: -46m (ห่าง 14m), Fountain: -60m (ห่าง 14m)
-            BlueOuterTower = new TowerEntity("blue_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, -14f), 0);
-            BlueInnerTower = new TowerEntity("blue_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, -32f), 0);
-            BlueNexus = new TowerEntity("blue_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, -46f), 0);
+            Vector3 expectedRedFountain = DuelArenaLayout.MirrorPoint(blueFountainPos);
+            if ((redFountainPos - expectedRedFountain).sqrMagnitude > 0.0001f)
+                throw new ArgumentException("Fountain anchors must be point-symmetric through the arena origin.");
+            if (!ArenaBounds.Contains(blueFountainPos, FountainZoneRadius)
+                || !ArenaBounds.Contains(redFountainPos, FountainZoneRadius))
+                throw new ArgumentOutOfRangeException(nameof(blueFountainPos), "Fountain healing zones must remain inside arena bounds.");
+
+            // Section 3.1: all Red anchors derive from Blue anchors through point symmetry.
+            // Gaps tighten toward center: Fountain-Nexus 17m, Nexus-Inner 15m,
+            // Inner-Outer 13m, and Outer-Center 12m.
+            BlueOuterTower = new TowerEntity("blue_tower_t1", StructureStats.CreateTier1OuterTower(), DuelArenaLayout.BlueOuterTower, 0);
+            BlueInnerTower = new TowerEntity("blue_tower_t2", StructureStats.CreateTier2InnerTower(), DuelArenaLayout.BlueInnerTower, 0);
+            BlueNexus = new TowerEntity("blue_nexus", StructureStats.CreateNexusCore(), DuelArenaLayout.BlueNexus, 0);
             BlueTowers.AddRange(new[] { BlueOuterTower, BlueInnerTower, BlueNexus });
 
-            // สร้างป้อมปราการฝั่ง Red (แผนที่ 130m)
-            RedOuterTower = new TowerEntity("red_tower_t1", StructureStats.CreateTier1OuterTower(), new Vector3(0, 0, 14f), 1);
-            RedInnerTower = new TowerEntity("red_tower_t2", StructureStats.CreateTier2InnerTower(), new Vector3(0, 0, 32f), 1);
-            RedNexus = new TowerEntity("red_nexus", StructureStats.CreateNexusCore(), new Vector3(0, 0, 46f), 1);
+            RedOuterTower = new TowerEntity("red_tower_t1", StructureStats.CreateTier1OuterTower(), DuelArenaLayout.RedOuterTower, 1);
+            RedInnerTower = new TowerEntity("red_tower_t2", StructureStats.CreateTier2InnerTower(), DuelArenaLayout.RedInnerTower, 1);
+            RedNexus = new TowerEntity("red_nexus", StructureStats.CreateNexusCore(), DuelArenaLayout.RedNexus, 1);
             RedTowers.AddRange(new[] { RedOuterTower, RedInnerTower, RedNexus });
 
             // ตั้งค่า Damage Immunity ตามลำดับ (Section 3.3)
@@ -99,19 +141,19 @@ namespace KOA.Core.Match
             BlueOuterTower.OnDestroyed += () =>
             {
                 BlueInnerTower.IsInvulnerable = false;
-                RedWallet.AddGold(StructureStats.CreateTier1OuterTower().GoldBounty);
+                GrantStructureReward(RedWallet, 1, BlueOuterTower, StructureStats.CreateTier1OuterTower().GoldBounty);
                 RedSpawner.HasCannonMinion = true; // Red ได้ Cannon Minion
                 OnTowerDestroyed?.Invoke(BlueOuterTower);
-                OnKillFeedMessage?.Invoke("Blue Outer Tower destroyed! Red Team now deploys Cannon Minions!");
+                OnKillFeedMessage?.Invoke($"Red Team destroyed Blue Outer Tower  |  +{StructureStats.CreateTier1OuterTower().GoldBounty} gold");
             };
 
             BlueInnerTower.OnDestroyed += () =>
             {
                 BlueNexus.IsInvulnerable = false;
-                RedWallet.AddGold(StructureStats.CreateTier2InnerTower().GoldBounty);
+                GrantStructureReward(RedWallet, 1, BlueInnerTower, StructureStats.CreateTier2InnerTower().GoldBounty);
                 RedSpawner.HasSuperMinion = true; // Red ได้ Super Creep
                 OnTowerDestroyed?.Invoke(BlueInnerTower);
-                OnKillFeedMessage?.Invoke("Blue Inner Tower destroyed! Red Team now deploys Super Creeps!");
+                OnKillFeedMessage?.Invoke($"Red Team destroyed Blue Inner Tower  |  +{StructureStats.CreateTier2InnerTower().GoldBounty} gold");
             };
 
             BlueNexus.OnDestroyed += () =>
@@ -123,19 +165,19 @@ namespace KOA.Core.Match
             RedOuterTower.OnDestroyed += () =>
             {
                 RedInnerTower.IsInvulnerable = false;
-                BlueWallet.AddGold(StructureStats.CreateTier1OuterTower().GoldBounty);
+                GrantStructureReward(BlueWallet, 0, RedOuterTower, StructureStats.CreateTier1OuterTower().GoldBounty);
                 BlueSpawner.HasCannonMinion = true; // Blue ได้ Cannon Minion
                 OnTowerDestroyed?.Invoke(RedOuterTower);
-                OnKillFeedMessage?.Invoke("Red Outer Tower destroyed! Blue Team now deploys Cannon Minions!");
+                OnKillFeedMessage?.Invoke($"Blue Team destroyed Red Outer Tower  |  +{StructureStats.CreateTier1OuterTower().GoldBounty} gold");
             };
 
             RedInnerTower.OnDestroyed += () =>
             {
                 RedNexus.IsInvulnerable = false;
-                BlueWallet.AddGold(StructureStats.CreateTier2InnerTower().GoldBounty);
+                GrantStructureReward(BlueWallet, 0, RedInnerTower, StructureStats.CreateTier2InnerTower().GoldBounty);
                 BlueSpawner.HasSuperMinion = true; // Blue ได้ Super Creep
                 OnTowerDestroyed?.Invoke(RedInnerTower);
-                OnKillFeedMessage?.Invoke("Red Inner Tower destroyed! Blue Team now deploys Super Creeps!");
+                OnKillFeedMessage?.Invoke($"Blue Team destroyed Red Inner Tower  |  +{StructureStats.CreateTier2InnerTower().GoldBounty} gold");
             };
 
             RedNexus.OnDestroyed += () =>
@@ -155,19 +197,107 @@ namespace KOA.Core.Match
 
         private void HandleMinionKilled(MinionEntity minion, string killerId)
         {
-            if (killerId != null)
+            if (minion == null || string.IsNullOrEmpty(killerId)) return;
+
+            // Section 4.1: creep gold is granted only when an enemy hero delivers
+            // the last hit. Allied minions and structures never credit the wallet.
+            if (BlueHero != null
+                && minion.TeamId != BlueHero.TeamId
+                && killerId == BlueHero.DamageSourceId)
             {
-                if (killerId.Contains("blue") || (BlueHero != null && killerId == BlueHero.HeroId))
-                {
-                    BlueWallet.AddGold(minion.GoldBounty);
-                    BlueHero?.AddExp(minion.ExpBounty);
-                }
-                else if (killerId.Contains("red") || (RedHero != null && killerId == RedHero.HeroId))
-                {
-                    RedWallet.AddGold(minion.GoldBounty);
-                    RedHero?.AddExp(minion.ExpBounty);
-                }
+                GrantLastHitReward(BlueWallet, BlueHero, minion);
             }
+            else if (RedHero != null
+                && minion.TeamId != RedHero.TeamId
+                && killerId == RedHero.DamageSourceId)
+            {
+                GrantLastHitReward(RedWallet, RedHero, minion);
+            }
+        }
+
+        private void GrantLastHitReward(PlayerWallet wallet, HeroBase3D hero, MinionEntity minion)
+        {
+            wallet.AddGold(minion.GoldBounty);
+            hero.AddExp(minion.ExpBounty);
+            OnGoldRewardGranted?.Invoke(new GoldRewardEvent(
+                hero.TeamId,
+                minion.GoldBounty,
+                minion.Position,
+                GoldRewardReason.MinionLastHit,
+                hero.DamageSourceId,
+                minion.MinionId));
+        }
+
+        private void GrantStructureReward(PlayerWallet wallet, int teamId, TowerEntity structure, int amount)
+        {
+            wallet.AddGold(amount);
+            OnGoldRewardGranted?.Invoke(new GoldRewardEvent(
+                teamId,
+                amount,
+                structure.Position,
+                GoldRewardReason.StructureDestroyed,
+                teamId == 0 ? BlueHero?.DamageSourceId : RedHero?.DamageSourceId,
+                structure.TowerId));
+        }
+
+        public int RecordHeroElimination(HeroBase3D victim)
+        {
+            if (victim == null || victim.IsAlive) return 0;
+
+            int victimTeamId = ReferenceEquals(victim, BlueHero) ? 0 : ReferenceEquals(victim, RedHero) ? 1 : -1;
+            if (victimTeamId < 0) return 0;
+
+            PlayerWallet victimWallet = victimTeamId == 0 ? BlueWallet : RedWallet;
+            victimWallet.RecordDeath();
+
+            HeroBase3D killer = null;
+            if (BlueHero != null && victimTeamId != 0 && victim.LastDamageSourceId == BlueHero.DamageSourceId)
+                killer = BlueHero;
+            else if (RedHero != null && victimTeamId != 1 && victim.LastDamageSourceId == RedHero.DamageSourceId)
+                killer = RedHero;
+
+            string victimTeam = victimTeamId == 0 ? "Blue" : "Red";
+            if (killer == null)
+            {
+                string sourceLabel = ResolveDamageSourceLabel(victim.LastDamageSourceId);
+                OnKillFeedMessage?.Invoke($"{victimTeam} {victim.DisplayName} was defeated by {sourceLabel}  |  no hero bounty");
+                return 0;
+            }
+
+            int killerTeamId = killer.TeamId;
+            PlayerWallet killerWallet = killerTeamId == 0 ? BlueWallet : RedWallet;
+
+            int goldBefore = killerWallet.CurrentGold;
+            killerWallet.RecordHeroKill();
+            int bounty = killerWallet.CurrentGold - goldBefore;
+            killer.AddExp(350f);
+
+            OnGoldRewardGranted?.Invoke(new GoldRewardEvent(
+                killerTeamId,
+                bounty,
+                victim.Position,
+                GoldRewardReason.HeroElimination,
+                killer.DamageSourceId,
+                victim.TargetId));
+
+            string killerTeam = killerTeamId == 0 ? "Blue" : "Red";
+            OnKillFeedMessage?.Invoke($"{killerTeam} {killer.DisplayName} defeated {victimTeam} {victim.DisplayName}  |  +{bounty} gold");
+            return bounty;
+        }
+
+        private string ResolveDamageSourceLabel(string sourceId)
+        {
+            if (string.IsNullOrEmpty(sourceId)) return "the battlefield";
+
+            MinionEntity sourceMinion = ActiveMinions.Find(minion => minion.MinionId == sourceId);
+            if (sourceMinion != null) return sourceMinion.TeamId == 0 ? "Blue Minion" : "Red Minion";
+
+            TowerEntity sourceTower = BlueTowers.Find(tower => tower.TowerId == sourceId);
+            if (sourceTower != null) return "Blue Tower";
+            sourceTower = RedTowers.Find(tower => tower.TowerId == sourceId);
+            if (sourceTower != null) return "Red Tower";
+
+            return "the battlefield";
         }
 
         public void SimulationTick(float deltaTime)

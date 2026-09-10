@@ -82,12 +82,26 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 - **รูปแบบ:** เลนเดียว แนวยาว (Corridor) เชื่อม Fountain ทั้งสองฝั่ง
 - **ขนาดสนามโดยประมาณ:** ยาว 130 เมตร x กว้าง 26 เมตร (1 Grid Unit = 1 เมตร)
   - ขอบเขตที่เล่นได้คือ X = -13m ถึง +13m และ Z = -65m ถึง +65m โดยศูนย์กลางของฮีโร่ต้องเว้นขอบตามรัศมีตัวละคร การเดิน, dash, displacement, rewind และ respawn ต้องไม่สามารถพาฮีโร่ออกนอกสนาม
-  - Blue Fountain: Z = -60m, Blue Nexus: Z = -46m, Blue Inner Tower: Z = -32m, Blue Outer Tower: Z = -14m
-  - Red Outer Tower: Z = +14m, Red Inner Tower: Z = +32m, Red Nexus: Z = +46m, Red Fountain: Z = +60m
-  - พื้นที่ปะทะกลางเลน (Center Clash Zone): ระหว่าง Outer Towers กว้าง 28 เมตร (Z = -14m ถึง +14m)
+  - Blue Fountain: Z = -57m, Blue Nexus: Z = -40m, Blue Inner Tower: Z = -25m, Blue Outer Tower: Z = -12m
+  - Red Outer Tower: Z = +12m, Red Inner Tower: Z = +25m, Red Nexus: Z = +40m, Red Fountain: Z = +57m
+  - ทุกตำแหน่งฝั่ง Red ต้องคำนวณจากตำแหน่งฝั่ง Blue ด้วย Point Symmetry `(x, y, z) → (-x, y, -z)` ห้ามกำหนดแยกจนเกิดระยะคลาดเคลื่อน
+  - ระยะจากฐานเข้าสู่กลางเลนต้องค่อยๆ กระชับ: Fountain→Nexus 17m, Nexus→Inner 15m, Inner→Outer 13m และ Outer→Center 12m
+  - พื้นที่ปะทะกลางเลน (Center Clash Zone): ระหว่าง Outer Towers กว้าง 24 เมตร (Z = -12m ถึง +12m)
 - **Fountain Zone:** รัศมี 7.5 เมตร อยู่ด้านหลัง Nexus แต่ละฝั่ง มี HP/Mana regen สไตล์ Inspire MOBA (~11% Max HP-MP/sec ใช้เวลาประมาณ 8-10 วินาทีเต็มหลอด) และ invulnerability
-- **Bush/พุ่มหญ้า:** วางไว้ 2 จุด สมมาตรกันบริเวณกึ่งกลางเลน (X = -8m และ X = +8m, Z = -4m ถึง +4m)
+- **Bush/พุ่มหญ้า:** วางแบบ Point Symmetry และเยื้อง Sightline กลางเลน โดยมีจุดศูนย์กลาง Blue `(X=-8m, Z=-3.5m)` และ Red `(X=+8m, Z=+3.5m)` ขนาดประมาณ 3.2m x 6.0m
 - **ไม่มี Jungle Camp / Neutral Monster** ใน 1.0.0
+
+### 3.1.1 Environment Composition Principles
+
+ฉากทดสอบ `Assets/Scenes/DuelArena.unity` ต้องสร้าง Presentation environment โดยไม่เปลี่ยนกฎ Simulation Core และใช้หลักดังนี้:
+
+1. **Point Symmetry:** Fountain, Nexus, Tower และ Brush เป็นตำแหน่ง gameplay ที่สะท้อนผ่านจุดศูนย์กลางเดียวกัน
+2. **Rhythmic Spacing:** ช่องไฟโครงสร้างไม่เท่ากันและกระชับเข้าหา Duel Plaza ตามค่าที่ล็อกใน Section 3.1
+3. **Occlusion Framing:** หน้าผา, เรือนยอดไม้ และก้อนหินริมทางแบ่งเป็นช่วงความสูง/ความถี่ไม่สม่ำเสมอ ห้ามใช้กำแพงสูงเท่ากันตลอดเลน
+4. **Sightline Bush Placement:** Brush ต้องเยื้องแกน X=0 และเยื้อง Z=0 เพื่อสร้างการตัดสินใจด้าน vision ไม่ใช่ของตกแต่งกลางทาง
+5. **Focal Lighting:** Nexus สว่างที่สุด, Fountain เป็นลำดับสอง และ Tower เป็นลำดับสาม; แสงต้องไม่บดบัง Health Bar หรือ telegraph การต่อสู้
+
+พื้นหญ้าจุลภาคใช้ Unity Terrain Detail/Grass แบบ runtime-generated และ mirrored density map; ป้อมฐาน, กำแพง, ประตู, บ่อ Fountain และ silhouette สำรองใช้ Primitive ก่อน ส่วน Asset ภายนอกใช้ได้เฉพาะรายการที่มี License ชัดเจนใน Demo Asset Manifest เท่านั้น องค์ประกอบ Presentation ต้องไม่เพิ่ม collider ที่ขยาย/ลดขอบเขตเล่นจริง
 
 ### 3.2 Creep Spawner & Escalation (อัปเดตระบบป้อมแตก)
 - **ความถี่:** ทุก 25.0 วินาที
@@ -175,6 +189,10 @@ RespawnTime (seconds) = 4 + (CurrentLevel * 2.5)
 | ทำลาย Tier 1 Tower | 150 gold |
 | ทำลาย Tier 2 Tower | 220 gold |
 | ฆ่าฮีโร่ศัตรู | Base 200 gold + (Killing Streak Bonus: +25 gold ต่อ streak, สูงสุด +150) |
+
+- Last-Hit Gold ต้องตรวจจาก Damage Source ของฮีโร่และทีมผู้โจมตีโดยตรง หากครีปหรือป้อมเป็นผู้ปิดงานจะไม่เพิ่มทองให้ Wallet
+- เมื่อผู้เล่น Last Hit สำเร็จ Presentation ต้องแสดงเหรียญทองแบบ world-space พร้อมจำนวน `+Gold` เหนือจุดที่ครีปตายและเล่นเสียงยืนยันสั้น โดยข้อมูลรางวัลต้องมาจาก Event ของ Simulation Core
+- เมื่อฮีโร่ถูกกำจัด Kill Feed ต้องระบุทีม/ชื่อผู้กำจัด ทีม/ชื่อผู้ถูกกำจัด และทองที่ผู้กำจัดได้รับจากเหตุการณ์นั้น
 
 ### 4.2 แหล่งที่มา EXP
 - ฆ่า/ร่วมสังหารครีป: ให้ EXP ตามระยะที่อยู่ใกล้ (Area-based, ไม่ต้อง Last-hit เพื่อได้ EXP — ต่างจาก Gold ที่ต้อง Last-hit)
@@ -364,6 +382,7 @@ Input Abstraction Layer (Section 1.1) ยังคงออกแบบไว้
 - ตัวเลข Damage Popup ลอยขึ้นเมื่อโดนตี/โดนสกิล โดยแสดงค่าดาเมจจริงหลังการลดทอนเพียงหนึ่งครั้งต่อ hit; Presentation ต้องซ่อน popup เมื่อผู้โจมตีและเป้าหมายเป็นครีปทั้งคู่ แต่ยังแสดงดาเมจที่ฮีโร่หรือสิ่งปลูกสร้างเป็นผู้โจมตี และดาเมจที่ฮีโร่/สิ่งปลูกสร้างได้รับ
 - แถบ Gold/Level/EXP มุมบนหน้าจอ
 - Kill Feed แบบเรียบง่าย (ข้อความ "You / Enemy destroyed [Tower]" หรือ "You / Enemy has been slain")
+- Kill Feed ของ Hero Elimination และ Tower Destruction ต้องแสดงจำนวนทองที่ได้รับ ส่วน Last Hit ครีปใช้เหรียญ world-space เพื่อไม่ทำให้ Feed เต็มจากเหตุการณ์ถี่
 - Kill Feed อยู่กึ่งกลางใต้ Top Bar, จำกัดไม่เกิน 3 รายการและต้องล้างข้อความหมดเมื่อครบเวลา เพื่อไม่ทับ Mini Map; Ability Feedback ไม่ถูกเพิ่มเข้ารายการนี้
 - Low-HP Vignette Warning เมื่อ HP ต่ำกว่า 25%
 - **Mini Map มุมซ้ายบน:** แสดงขอบสนาม, เลน, Fountain, Tower, Nexus, ครีป และฮีโร่ โดยตำแหน่งศัตรูต้องเคารพกฎ Vision/Brush ตาม Section 3.1 และ Section 8
